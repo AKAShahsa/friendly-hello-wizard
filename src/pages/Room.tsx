@@ -10,10 +10,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useTheme } from "@/contexts/ThemeContext";
 import { 
   Play, Pause, SkipBack, SkipForward, Volume2, Volume1, VolumeX,
-  Users, MessageSquare, Music, Moon, Sun, Home, Send, X
+  Users, MessageSquare, Music, Moon, Sun, Home, Send, X, Heart, 
+  ThumbsUp, Smile, Crown, Link
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Label } from "@/components/ui/label";
 
 // Format seconds to MM:SS
 const formatTime = (seconds: number): string => {
@@ -27,12 +30,16 @@ const Room = () => {
   const { 
     currentTrack, queue, isPlaying, currentTime, volume,
     users, togglePlayPause, nextTrack, prevTrack, seek, setVolume,
-    leaveRoom, messages, sendChatMessage
+    leaveRoom, messages, sendChatMessage, reactions, sendReaction, addSongByUrl
   } = useMusic();
   const [message, setMessage] = useState("");
   const [isUsersOpen, setIsUsersOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
+  const [isAddSongOpen, setIsAddSongOpen] = useState(false);
+  const [songUrl, setSongUrl] = useState("");
+  const [songTitle, setSongTitle] = useState("");
+  const [songArtist, setSongArtist] = useState("");
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -64,7 +71,29 @@ const Room = () => {
     }
   };
 
+  const handleAddSong = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (songUrl.trim()) {
+      addSongByUrl(songUrl, songTitle.trim() || undefined, songArtist.trim() || undefined)
+        .then(success => {
+          if (success) {
+            setSongUrl("");
+            setSongTitle("");
+            setSongArtist("");
+            setIsAddSongOpen(false);
+          }
+        });
+    } else {
+      toast({
+        title: "Missing URL",
+        description: "Please enter a song URL",
+        variant: "destructive"
+      });
+    }
+  };
+
   const activeUsers = users.filter(user => user.isActive);
+  const hostUser = users.find(user => user.isHost);
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-background to-secondary/20">
@@ -105,6 +134,34 @@ const Room = () => {
               <Music className="h-20 w-20 text-muted-foreground/50" />
             </div>
           )}
+        </div>
+
+        {/* Reaction Buttons */}
+        <div className="flex justify-center gap-4 mb-6">
+          <Button 
+            variant="outline" 
+            onClick={() => sendReaction("thumbsUp")}
+            className="flex flex-col items-center"
+          >
+            <ThumbsUp className="h-5 w-5" />
+            <span className="text-xs mt-1">{reactions.thumbsUp}</span>
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => sendReaction("heart")}
+            className="flex flex-col items-center"
+          >
+            <Heart className="h-5 w-5" />
+            <span className="text-xs mt-1">{reactions.heart}</span>
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => sendReaction("smile")}
+            className="flex flex-col items-center"
+          >
+            <Smile className="h-5 w-5" />
+            <span className="text-xs mt-1">{reactions.smile}</span>
+          </Button>
         </div>
 
         {/* Player Controls */}
@@ -184,6 +241,10 @@ const Room = () => {
             {activeUsers.length}
           </span>
         </Button>
+        <Button variant="outline" onClick={() => setIsAddSongOpen(true)}>
+          <Link className="h-5 w-5 mr-2" />
+          <span className="sr-md:not-sr-only">Add URL</span>
+        </Button>
         <Button variant="destructive" onClick={handleLeaveRoom}>
           <X className="h-5 w-5 mr-2" />
           <span className="sr-md:not-sr-only">Leave</span>
@@ -244,11 +305,21 @@ const Room = () => {
                       key={user.id}
                       className="flex items-center gap-3 p-2 rounded-md hover:bg-secondary/80"
                     >
+                      <Avatar>
+                        <AvatarFallback>
+                          {user.name.substring(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 font-medium">
+                        {user.name}
+                        {user.isHost && (
+                          <span className="ml-2 inline-flex items-center">
+                            <Crown className="h-4 w-4 text-yellow-500" />
+                            <span className="text-xs ml-1 text-muted-foreground">Host</span>
+                          </span>
+                        )}
+                      </div>
                       <div className={`h-3 w-3 rounded-full ${user.isActive ? 'bg-green-500' : 'bg-gray-400'}`} />
-                      <div className="font-medium">{user.name}</div>
-                      {user.isActive && (
-                        <div className="ml-auto text-xs text-muted-foreground">Active</div>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -304,6 +375,56 @@ const Room = () => {
               <Button type="submit" size="icon">
                 <Send className="h-4 w-4" />
               </Button>
+            </form>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Add Song Sheet */}
+      <Sheet open={isAddSongOpen} onOpenChange={setIsAddSongOpen}>
+        <SheetContent>
+          <div className="h-full flex flex-col">
+            <h2 className="text-xl font-semibold mb-4">Add Song by URL</h2>
+            <form onSubmit={handleAddSong} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="song-url">Audio URL (required)</Label>
+                <Input
+                  id="song-url"
+                  value={songUrl}
+                  onChange={(e) => setSongUrl(e.target.value)}
+                  placeholder="https://example.com/song.mp3"
+                  className="flex-1"
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="song-title">Song Title (optional)</Label>
+                <Input
+                  id="song-title"
+                  value={songTitle}
+                  onChange={(e) => setSongTitle(e.target.value)}
+                  placeholder="Enter song title"
+                  className="flex-1"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="song-artist">Artist Name (optional)</Label>
+                <Input
+                  id="song-artist"
+                  value={songArtist}
+                  onChange={(e) => setSongArtist(e.target.value)}
+                  placeholder="Enter artist name"
+                  className="flex-1"
+                />
+              </div>
+              
+              <div className="pt-4">
+                <Button type="submit" className="w-full">
+                  Add to Queue
+                </Button>
+              </div>
             </form>
           </div>
         </SheetContent>

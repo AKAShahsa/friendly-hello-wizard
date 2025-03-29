@@ -1,9 +1,8 @@
-
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { Howl } from "howler";
 import { toast } from "@/hooks/use-toast";
 import { db, rtdb } from "@/lib/firebase";
-import { ref, onValue, set, push, update, get } from "firebase/database";
+import { ref, onValue, set, push, update, get, increment } from "firebase/database";
 import { useParams } from "react-router-dom";
 import { socket } from "@/lib/socket";
 
@@ -22,6 +21,13 @@ interface User {
   name: string;
   isActive: boolean;
   lastActive: number;
+  isHost?: boolean;
+}
+
+interface Reaction {
+  thumbsUp: number;
+  heart: number;
+  smile: number;
 }
 
 interface MusicContextType {
@@ -32,6 +38,7 @@ interface MusicContextType {
   volume: number;
   users: User[];
   roomId: string | null;
+  reactions: Reaction;
   createRoom: (name: string) => Promise<string>;
   joinRoom: (roomId: string, userName: string) => Promise<boolean>;
   leaveRoom: () => void;
@@ -44,6 +51,8 @@ interface MusicContextType {
   seek: (time: number) => void;
   setVolume: (volume: number) => void;
   sendChatMessage: (message: string) => void;
+  sendReaction: (reactionType: keyof Reaction) => void;
+  addSongByUrl: (url: string, title?: string, artist?: string) => Promise<boolean>;
   messages: { userId: string, userName: string, text: string, timestamp: number }[];
 }
 
@@ -89,6 +98,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [users, setUsers] = useState<User[]>([]);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Array<{ userId: string, userName: string, text: string, timestamp: number }>>([]);
+  const [reactions, setReactions] = useState<Reaction>({ thumbsUp: 0, heart: 0, smile: 0 });
 
   const userId = localStorage.getItem("userId") || `user_${Math.random().toString(36).substring(2, 9)}`;
   
@@ -96,7 +106,6 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem("userId", userId);
   }, [userId]);
 
-  // Timer for updating current time
   useEffect(() => {
     if (!sound || !isPlaying) return;
     
@@ -104,7 +113,6 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const time = sound.seek();
       setCurrentTime(typeof time === 'number' ? time : 0);
       
-      // If in a room, update the playback position
       if (roomId) {
         const userRef = ref(rtdb, `rooms/${roomId}/users/${userId}`);
         update(userRef, {
@@ -117,7 +125,6 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => clearInterval(timer);
   }, [sound, isPlaying, roomId, userId]);
 
-  // Socket event listeners
   useEffect(() => {
     if (!roomId) return;
 
@@ -166,6 +173,15 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     });
 
+    socket.on("newReaction", (data) => {
+      if (data.roomId === roomId) {
+        setReactions(prev => ({
+          ...prev,
+          [data.reactionType]: prev[data.reactionType] + 1
+        }));
+      }
+    });
+
     return () => {
       socket.off("play");
       socket.off("pause");
@@ -173,10 +189,10 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       socket.off("nextTrack");
       socket.off("prevTrack");
       socket.off("newMessage");
+      socket.off("newReaction");
     };
   }, [roomId, sound, isPlaying, queue, currentTrack]);
 
-  // Firebase room listeners
   useEffect(() => {
     if (!roomId) return;
     
@@ -185,12 +201,10 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const roomData = snapshot.val();
       if (!roomData) return;
       
-      // Update queue
       if (roomData.queue) {
         setQueue(Object.values(roomData.queue));
       }
       
-      // Update current track
       if (roomData.currentTrack) {
         const newTrack = roomData.currentTrack;
         if (!currentTrack || currentTrack.id !== newTrack.id) {
@@ -198,34 +212,33 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       }
       
-      // Update users
       if (roomData.users) {
         const usersList: User[] = Object.values(roomData.users);
         
-        // Check for inactive users (more than 60s without update)
         const activeUsers = usersList.filter(user => {
           const isActive = Date.now() - user.lastActive < 60000;
           if (!isActive && user.isActive) {
-            // Update user status to inactive
             const userRef = ref(rtdb, `rooms/${roomId}/users/${user.id}`);
             update(userRef, { isActive: false });
           }
-          return true; // Keep all users in the list
+          return true;
         });
         
         setUsers(activeUsers);
       }
       
-      // Update messages
       if (roomData.messages) {
         setMessages(Object.values(roomData.messages));
+      }
+
+      if (roomData.reactions) {
+        setReactions(roomData.reactions);
       }
     });
     
     return () => unsubscribe();
   }, [roomId, currentTrack]);
 
-  // Create a new room
   const createRoom = async (name: string): Promise<string> => {
     const newRoomRef = push(ref(rtdb, 'rooms'));
     const newRoomId = newRoomRef.key as string;
@@ -240,20 +253,24 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           id: userId,
           name: name,
           isActive: true,
-          lastActive: Date.now()
+          lastActive: Date.now(),
+          isHost: true
         }
+      },
+      reactions: {
+        thumbsUp: 0,
+        heart: 0,
+        smile: 0
       }
     });
     
     setRoomId(newRoomId);
     
-    // Join the socket room
     socket.emit("joinRoom", { roomId: newRoomId, userId });
     
     return newRoomId;
   };
 
-  // Join an existing room
   const joinRoom = async (roomId: string, userName: string): Promise<boolean> => {
     const roomRef = ref(rtdb, `rooms/${roomId}`);
     const snapshot = await get(roomRef);
@@ -269,17 +286,16 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     
     const roomData = snapshot.val();
     
-    // Add user to the room
     await set(ref(rtdb, `rooms/${roomId}/users/${userId}`), {
       id: userId,
       name: userName,
       isActive: true,
-      lastActive: Date.now()
+      lastActive: Date.now(),
+      isHost: false
     });
     
     setRoomId(roomId);
     
-    // Load the current room state
     if (roomData.queue) {
       setQueue(Object.values(roomData.queue));
     }
@@ -291,30 +307,58 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (roomData.messages) {
       setMessages(Object.values(roomData.messages));
     }
+
+    if (roomData.reactions) {
+      setReactions(roomData.reactions);
+    }
     
-    // Join the socket room
     socket.emit("joinRoom", { roomId, userId });
     
     return true;
   };
 
-  // Leave the current room
-  const leaveRoom = () => {
-    if (!roomId) return;
+  const addSongByUrl = async (url: string, title?: string, artist?: string): Promise<boolean> => {
+    if (!url || !url.trim()) {
+      toast({
+        title: "Invalid URL",
+        description: "Please enter a valid audio URL",
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    const suggestedTitle = title || url.split('/').pop()?.split('.')[0] || "Unknown Track";
+    const trackArtist = artist || "Unknown Artist";
+
+    const newTrack: Track = {
+      id: `track_${Date.now()}`,
+      title: suggestedTitle,
+      artist: trackArtist,
+      album: "Added via URL",
+      coverUrl: "https://upload.wikimedia.org/wikipedia/commons/c/ca/CD-ROM.png",
+      audioUrl: url,
+      duration: 180
+    };
+
+    addToQueue(newTrack);
     
-    // Update the user status
-    const userRef = ref(rtdb, `rooms/${roomId}/users/${userId}`);
-    update(userRef, { isActive: false });
-    
-    // Leave the socket room
-    socket.emit("leaveRoom", { roomId, userId });
-    
-    setRoomId(null);
-    setUsers([]);
-    setMessages([]);
+    toast({
+      title: "Song added",
+      description: `Added "${suggestedTitle}" to the queue`
+    });
+
+    return true;
   };
 
-  // Play a specific track
+  const sendReaction = (reactionType: keyof Reaction) => {
+    if (!roomId) return;
+
+    const reactionRef = ref(rtdb, `rooms/${roomId}/reactions/${reactionType}`);
+    update(reactionRef, increment(1));
+
+    socket.emit("newReaction", { roomId, reactionType, userId });
+  };
+
   const playTrack = useCallback((track: Track) => {
     if (sound) {
       sound.stop();
@@ -328,11 +372,9 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setIsPlaying(true);
         
         if (roomId) {
-          // Update room's current track
           const roomRef = ref(rtdb, `rooms/${roomId}`);
           update(roomRef, { currentTrack: track });
           
-          // Notify other users
           socket.emit("play", { roomId, trackId: track.id });
         }
       },
@@ -355,7 +397,6 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setCurrentTime(0);
   }, [volume, roomId, sound]);
 
-  // Toggle play/pause
   const togglePlayPause = () => {
     if (!sound) return;
     
@@ -366,7 +407,6 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Play the next track in queue
   const nextTrack = () => {
     if (!currentTrack || queue.length === 0) return;
     
@@ -380,7 +420,6 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Play the previous track in queue
   const prevTrack = () => {
     if (!currentTrack || queue.length === 0) return;
     
@@ -394,7 +433,6 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Seek to a specific position in the track
   const seek = (time: number) => {
     if (!sound) return;
     
@@ -406,7 +444,6 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Set the volume
   const setVolume = (newVolume: number) => {
     if (sound) {
       sound.volume(newVolume);
@@ -414,7 +451,6 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setVolumeState(newVolume);
   };
 
-  // Add a track to the queue
   const addToQueue = (track: Track) => {
     setQueue(prev => [...prev, track]);
     
@@ -429,7 +465,6 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   };
 
-  // Remove a track from the queue
   const removeFromQueue = (trackId: string) => {
     setQueue(prev => prev.filter(track => track.id !== trackId));
     
@@ -439,7 +474,6 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Send a chat message
   const sendChatMessage = (text: string) => {
     if (!roomId || !text.trim()) return;
     
@@ -467,6 +501,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       volume,
       users,
       roomId,
+      reactions,
       createRoom,
       joinRoom,
       leaveRoom,
@@ -479,6 +514,8 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       seek,
       setVolume,
       sendChatMessage,
+      sendReaction,
+      addSongByUrl,
       messages
     }}>
       {children}
