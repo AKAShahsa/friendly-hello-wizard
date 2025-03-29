@@ -20,3 +20,8 @@ socket.on("disconnect", () => {
 socket.on("error", (error) => {
   console.error("Socket error:", error);
 });
+
+// Add handler for room leaving event
+socket.on("userLeft", (data) => {
+  console.log("User left the room:", data);
+});

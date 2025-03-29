@@ -317,6 +317,27 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return true;
   };
 
+  const leaveRoom = () => {
+    if (!roomId) return;
+    
+    const userRef = ref(rtdb, `rooms/${roomId}/users/${userId}`);
+    update(userRef, {
+      isActive: false,
+      lastActive: Date.now()
+    });
+    
+    socket.emit("leaveRoom", { roomId, userId });
+    
+    setRoomId(null);
+    setUsers([]);
+    setMessages([]);
+    
+    toast({
+      title: "Left room",
+      description: "You have successfully left the room"
+    });
+  };
+
   const addSongByUrl = async (url: string, title?: string, artist?: string): Promise<boolean> => {
     if (!url || !url.trim()) {
       toast({
