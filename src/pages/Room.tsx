@@ -32,19 +32,25 @@ const Room = () => {
   const [isAddSongOpen, setIsAddSongOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
+  
+  // Track if room has been joined to prevent multiple join attempts
+  const [hasJoinedRoom, setHasJoinedRoom] = useState(false);
 
   // Join room on mount if roomId is available - only once
   useEffect(() => {
-    if (roomId) {
+    if (roomId && !hasJoinedRoom) {
       const userName = localStorage.getItem("userName") || "Guest";
       joinRoom(roomId, userName);
+      setHasJoinedRoom(true);
     }
     
     // Handle room leaving on component unmount
     return () => {
-      leaveRoom();
+      if (hasJoinedRoom) {
+        leaveRoom();
+      }
     };
-  }, [roomId, joinRoom, leaveRoom]);
+  }, [roomId, joinRoom, leaveRoom, hasJoinedRoom]);
 
   const handleLeaveRoom = useCallback(() => {
     leaveRoom();
@@ -52,17 +58,54 @@ const Room = () => {
   }, [leaveRoom, navigate]);
 
   // Memoize to prevent unnecessary re-renders
-  const activeUsers = useMemo(() => users.filter(user => user.isActive), [users]);
+  const activeUsers = useMemo(() => {
+    return users.filter(user => user.isActive);
+  }, [users]);
+  
+  // Memoize component props to prevent unnecessary re-renders
+  const roomHeaderProps = useMemo(() => ({
+    roomId,
+    theme,
+    toggleTheme
+  }), [roomId, theme, toggleTheme]);
+  
+  const trackDisplayProps = useMemo(() => ({
+    currentTrack
+  }), [currentTrack]);
+  
+  const reactionButtonsProps = useMemo(() => ({
+    reactions,
+    sendReaction
+  }), [reactions, sendReaction]);
+  
+  const playerControlsProps = useMemo(() => ({
+    currentTrack,
+    isPlaying,
+    currentTime,
+    volume,
+    togglePlayPause,
+    nextTrack,
+    prevTrack,
+    seek,
+    setVolume
+  }), [currentTrack, isPlaying, currentTime, volume, togglePlayPause, nextTrack, prevTrack, seek, setVolume]);
+  
+  const roomFooterProps = useMemo(() => ({
+    setIsQueueOpen,
+    setIsChatOpen,
+    setIsUsersOpen,
+    setIsAddSongOpen,
+    handleLeaveRoom,
+    queueLength: queue.length,
+    messagesLength: messages.length,
+    activeUsersLength: activeUsers.length
+  }), [queue.length, messages.length, activeUsers.length, handleLeaveRoom]);
   
   return (
     <TooltipProvider>
       <div className="min-h-screen flex flex-col bg-gradient-to-br from-background to-secondary/20">
         {/* Header */}
-        <RoomHeader 
-          roomId={roomId} 
-          theme={theme} 
-          toggleTheme={toggleTheme} 
-        />
+        <RoomHeader {...roomHeaderProps} />
 
         {/* User Avatars - horizontal scrollable list of users */}
         <UserAvatars users={users} />
@@ -70,36 +113,17 @@ const Room = () => {
         {/* Main Content */}
         <main className="flex-1 flex flex-col items-center justify-center p-4 md:p-8">
           {/* Album Art and Track Info */}
-          <TrackDisplay currentTrack={currentTrack} />
+          <TrackDisplay {...trackDisplayProps} />
 
           {/* Reaction Buttons */}
-          <ReactionButtons reactions={reactions} sendReaction={sendReaction} />
+          <ReactionButtons {...reactionButtonsProps} />
 
           {/* Player Controls */}
-          <PlayerControls 
-            currentTrack={currentTrack}
-            isPlaying={isPlaying}
-            currentTime={currentTime}
-            volume={volume}
-            togglePlayPause={togglePlayPause}
-            nextTrack={nextTrack}
-            prevTrack={prevTrack}
-            seek={seek}
-            setVolume={setVolume}
-          />
+          <PlayerControls {...playerControlsProps} />
         </main>
 
         {/* Sidebar Triggers */}
-        <RoomFooter 
-          setIsQueueOpen={setIsQueueOpen}
-          setIsChatOpen={setIsChatOpen}
-          setIsUsersOpen={setIsUsersOpen}
-          setIsAddSongOpen={setIsAddSongOpen}
-          handleLeaveRoom={handleLeaveRoom}
-          queueLength={queue.length}
-          messagesLength={messages.length}
-          activeUsersLength={activeUsers.length}
-        />
+        <RoomFooter {...roomFooterProps} />
 
         {/* Queue Sheet */}
         <QueueSheet 

@@ -1,5 +1,4 @@
-
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Howl } from "howler";
 import { Track } from "../types/music";
 import { socket } from "@/lib/socket";
@@ -11,45 +10,59 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
+  
+  const prevTrackRef = useRef<string | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const playTrack = useCallback((track: Track) => {
+    if (prevTrackRef.current === track.id) return;
+    prevTrackRef.current = track.id;
+    
     if (sound) {
       sound.stop();
     }
     
-    const newSound = new Howl({
-      src: [track.audioUrl],
-      html5: true,
-      volume: volume,
-      onplay: () => {
-        setIsPlaying(true);
-        
-        if (roomId) {
-          const roomRef = ref(rtdb, `rooms/${roomId}`);
-          update(roomRef, { currentTrack: track });
+    try {
+      const newSound = new Howl({
+        src: [track.audioUrl],
+        html5: true,
+        volume: volume,
+        onplay: () => {
+          setIsPlaying(true);
           
-          socket.emit("play", { roomId, trackId: track.id });
+          if (roomId) {
+            const roomRef = ref(rtdb, `rooms/${roomId}`);
+            update(roomRef, { currentTrack: track });
+            
+            socket.emit("play", { roomId, trackId: track.id });
+          }
+        },
+        onpause: () => {
+          setIsPlaying(false);
+          
+          if (roomId) {
+            socket.emit("pause", { roomId });
+          }
+        },
+        onend: () => {
+          setIsPlaying(false);
+        },
+        onloaderror: () => {
+          console.error(`Error loading audio: ${track.audioUrl}`);
+          setIsPlaying(false);
         }
-      },
-      onpause: () => {
-        setIsPlaying(false);
-        
-        if (roomId) {
-          socket.emit("pause", { roomId });
-        }
-      },
-      onend: () => {
-        setIsPlaying(false);
-      }
-    });
-    
-    newSound.play();
-    setSound(newSound);
-    setCurrentTrack(track);
-    setCurrentTime(0);
+      });
+      
+      newSound.play();
+      setSound(newSound);
+      setCurrentTrack(track);
+      setCurrentTime(0);
+    } catch (error) {
+      console.error("Error playing track:", error);
+    }
   }, [volume, roomId, sound]);
 
-  const togglePlayPause = () => {
+  const togglePlayPause = useCallback(() => {
     if (!sound) return;
     
     if (isPlaying) {
@@ -57,9 +70,9 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
     } else {
       sound.play();
     }
-  };
+  }, [sound, isPlaying]);
 
-  const seek = (time: number) => {
+  const seek = useCallback((time: number) => {
     if (!sound) return;
     
     sound.seek(time);
@@ -68,34 +81,59 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
     if (roomId) {
       socket.emit("seek", { roomId, position: time });
     }
-  };
+  }, [sound, roomId]);
 
-  const setVolume = (newVolume: number) => {
+  const setVolume = useCallback((newVolume: number) => {
     if (sound) {
       sound.volume(newVolume);
     }
-  };
+  }, [sound]);
 
-  // Setup for time tracking
-  const setupTimeTracking = (setCurrentTimeCallback: (time: number) => void) => {
+  const setupTimeTracking = useCallback((setCurrentTimeCallback: (time: number) => void) => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    
     if (!sound || !isPlaying) return () => {};
     
-    const timer = setInterval(() => {
-      const time = sound.seek();
-      const timeValue = typeof time === 'number' ? time : 0;
-      setCurrentTimeCallback(timeValue);
-      
-      if (roomId) {
-        const userRef = ref(rtdb, `rooms/${roomId}/users/${userId}`);
-        update(userRef, {
-          currentTime: timeValue,
-          lastActive: Date.now()
-        });
+    timerRef.current = setInterval(() => {
+      try {
+        const time = sound.seek();
+        const timeValue = typeof time === 'number' ? time : 0;
+        setCurrentTimeCallback(timeValue);
+        
+        if (roomId) {
+          const userRef = ref(rtdb, `rooms/${roomId}/users/${userId}`);
+          update(userRef, {
+            currentTime: timeValue,
+            lastActive: Date.now()
+          });
+        }
+      } catch (error) {
+        console.error("Error in time tracking:", error);
       }
     }, 1000);
     
-    return () => clearInterval(timer);
-  };
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [sound, isPlaying, roomId, userId]);
+  
+  useEffect(() => {
+    return () => {
+      if (sound) {
+        sound.stop();
+        sound.unload();
+      }
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [sound]);
 
   return {
     sound,
