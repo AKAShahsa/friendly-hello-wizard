@@ -1,5 +1,5 @@
 
-import React, { memo } from "react";
+import React, { memo, useEffect } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -13,6 +13,10 @@ interface UserAvatarsProps {
 const UserAvatars: React.FC<UserAvatarsProps> = memo(({ users }) => {
   const activeUsers = users.filter(user => user.isActive);
   
+  useEffect(() => {
+    console.log("Active users in UserAvatars:", activeUsers);
+  }, [activeUsers]);
+
   if (activeUsers.length === 0) {
     return (
       <div className="py-2 flex justify-center">

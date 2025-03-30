@@ -1,6 +1,5 @@
-
-import { useState } from "react";
-import { ref, update, set } from "firebase/database";
+import { useState, useEffect, useRef } from "react";
+import { ref, update, set, get } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
 import { toast } from "@/hooks/use-toast";
 import { Track } from "@/types/music";
@@ -8,21 +7,57 @@ import { socket } from "@/lib/socket";
 
 export const useQueue = (roomId: string | null, playTrackFn: (track: Track) => void) => {
   const [queue, setQueue] = useState<Track[]>([]);
+  const queueRef = useRef<Track[]>([]);
+  
+  useEffect(() => {
+    queueRef.current = queue;
+  }, [queue]);
+
+  useEffect(() => {
+    if (!roomId) return;
+    
+    const fetchQueue = async () => {
+      try {
+        const queueDbRef = ref(rtdb, `rooms/${roomId}/queue`);
+        const snapshot = await get(queueDbRef);
+        
+        if (snapshot.exists()) {
+          const queueData = snapshot.val();
+          const tracksList = Object.values(queueData) as Track[];
+          console.log("Fetched queue from Firebase:", tracksList);
+          setQueue(tracksList);
+        }
+      } catch (error) {
+        console.error("Error fetching queue:", error);
+      }
+    };
+    
+    fetchQueue();
+  }, [roomId]);
 
   const addToQueue = (track: Track) => {
-    // Add track to local queue
+    console.log("Adding to queue:", track);
     setQueue(prev => [...prev, track]);
     
-    // If room exists, update Firebase
     if (roomId) {
       const queueRef = ref(rtdb, `rooms/${roomId}/queue/${track.id}`);
-      set(queueRef, track);
+      set(queueRef, track)
+        .then(() => {
+          console.log("Successfully added track to Firebase queue");
+        })
+        .catch(error => {
+          console.error("Error adding track to queue:", error);
+        });
     }
     
     toast({
       title: "Added to queue",
       description: `${track.title} by ${track.artist} added to queue`
     });
+    
+    if (queue.length === 0) {
+      playTrackFn(track);
+    }
   };
 
   const removeFromQueue = (trackId: string) => {
@@ -38,12 +73,25 @@ export const useQueue = (roomId: string | null, playTrackFn: (track: Track) => v
     if (!currentTrack || queue.length === 0) return;
     
     const currentIndex = queue.findIndex(track => track.id === currentTrack.id);
+    console.log("Current track index:", currentIndex, "Queue length:", queue.length);
+    
     if (currentIndex < queue.length - 1) {
-      playTrackFn(queue[currentIndex + 1]);
+      const nextTrack = queue[currentIndex + 1];
+      console.log("Playing next track:", nextTrack);
+      playTrackFn(nextTrack);
       
       if (roomId) {
-        socket.emit("nextTrack", { roomId });
+        const roomRef = ref(rtdb, `rooms/${roomId}`);
+        update(roomRef, { currentTrack: nextTrack })
+          .then(() => {
+            socket.emit("nextTrack", { roomId });
+          })
+          .catch(error => {
+            console.error("Error updating next track:", error);
+          });
       }
+    } else {
+      console.log("No next track available");
     }
   };
 
@@ -51,12 +99,25 @@ export const useQueue = (roomId: string | null, playTrackFn: (track: Track) => v
     if (!currentTrack || queue.length === 0) return;
     
     const currentIndex = queue.findIndex(track => track.id === currentTrack.id);
+    console.log("Current track index (prev):", currentIndex);
+    
     if (currentIndex > 0) {
-      playTrackFn(queue[currentIndex - 1]);
+      const prevTrack = queue[currentIndex - 1];
+      console.log("Playing previous track:", prevTrack);
+      playTrackFn(prevTrack);
       
       if (roomId) {
-        socket.emit("prevTrack", { roomId });
+        const roomRef = ref(rtdb, `rooms/${roomId}`);
+        update(roomRef, { currentTrack: prevTrack })
+          .then(() => {
+            socket.emit("prevTrack", { roomId });
+          })
+          .catch(error => {
+            console.error("Error updating previous track:", error);
+          });
       }
+    } else {
+      console.log("No previous track available");
     }
   };
 
@@ -84,11 +145,6 @@ export const useQueue = (roomId: string | null, playTrackFn: (track: Track) => v
     };
 
     addToQueue(newTrack);
-    
-    // If no tracks are playing, start playing this one
-    if (queue.length === 0) {
-      playTrackFn(newTrack);
-    }
     
     toast({
       title: "Song added",

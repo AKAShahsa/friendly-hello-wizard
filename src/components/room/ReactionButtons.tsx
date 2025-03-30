@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ThumbsUp, Heart, Smile } from "lucide-react";
 import { useEffect, useState } from "react";
 import confetti from "canvas-confetti";
+import { toast } from "@/hooks/use-toast";
 
 interface ReactionButtonsProps {
   reactions: {
@@ -16,6 +17,11 @@ interface ReactionButtonsProps {
 
 const ReactionButtons: React.FC<ReactionButtonsProps> = ({ reactions, sendReaction }) => {
   const [lastTriggered, setLastTriggered] = useState<"thumbsUp" | "heart" | "smile" | null>(null);
+
+  useEffect(() => {
+    // Debug the reactions data
+    console.log("Current reactions state:", reactions);
+  }, [reactions]);
 
   useEffect(() => {
     if (!lastTriggered) return;
@@ -53,8 +59,18 @@ const ReactionButtons: React.FC<ReactionButtonsProps> = ({ reactions, sendReacti
   }, [lastTriggered]);
 
   const handleReaction = (type: "thumbsUp" | "heart" | "smile") => {
-    sendReaction(type);
-    setLastTriggered(type);
+    console.log(`Sending reaction: ${type}`);
+    try {
+      sendReaction(type);
+      setLastTriggered(type);
+    } catch (error) {
+      console.error(`Error sending ${type} reaction:`, error);
+      toast({
+        title: "Reaction Error",
+        description: "Failed to send your reaction. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -65,7 +81,7 @@ const ReactionButtons: React.FC<ReactionButtonsProps> = ({ reactions, sendReacti
         className="flex flex-col items-center"
       >
         <ThumbsUp className="h-5 w-5" />
-        <span className="text-xs mt-1">{reactions.thumbsUp}</span>
+        <span className="text-xs mt-1">{reactions.thumbsUp || 0}</span>
       </Button>
       <Button 
         variant="outline" 
@@ -73,7 +89,7 @@ const ReactionButtons: React.FC<ReactionButtonsProps> = ({ reactions, sendReacti
         className="flex flex-col items-center"
       >
         <Heart className="h-5 w-5" />
-        <span className="text-xs mt-1">{reactions.heart}</span>
+        <span className="text-xs mt-1">{reactions.heart || 0}</span>
       </Button>
       <Button 
         variant="outline" 
@@ -81,7 +97,7 @@ const ReactionButtons: React.FC<ReactionButtonsProps> = ({ reactions, sendReacti
         className="flex flex-col items-center"
       >
         <Smile className="h-5 w-5" />
-        <span className="text-xs mt-1">{reactions.smile}</span>
+        <span className="text-xs mt-1">{reactions.smile || 0}</span>
       </Button>
     </div>
   );

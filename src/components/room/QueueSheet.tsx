@@ -1,8 +1,9 @@
 
-import React from "react";
+import React, { useEffect } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Music } from "lucide-react";
+import { Music, Play } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface Track {
   id: string;
@@ -19,9 +20,27 @@ interface QueueSheetProps {
   onOpenChange: (isOpen: boolean) => void;
   queue: Track[];
   currentTrack: Track | null;
+  onPlayTrack?: (track: Track) => void;
 }
 
-const QueueSheet: React.FC<QueueSheetProps> = ({ isOpen, onOpenChange, queue, currentTrack }) => {
+const QueueSheet: React.FC<QueueSheetProps> = ({ 
+  isOpen, 
+  onOpenChange, 
+  queue, 
+  currentTrack,
+  onPlayTrack 
+}) => {
+  useEffect(() => {
+    console.log("Queue in QueueSheet:", queue);
+    console.log("Current track in QueueSheet:", currentTrack);
+  }, [queue, currentTrack]);
+
+  const handlePlayTrack = (track: Track) => {
+    if (onPlayTrack) {
+      onPlayTrack(track);
+    }
+  };
+
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent side="left">
@@ -46,6 +65,16 @@ const QueueSheet: React.FC<QueueSheetProps> = ({ isOpen, onOpenChange, queue, cu
                       <div className="font-medium truncate">{track.title}</div>
                       <div className="text-sm text-muted-foreground truncate">{track.artist}</div>
                     </div>
+                    {onPlayTrack && currentTrack?.id !== track.id && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8"
+                        onClick={() => handlePlayTrack(track)}
+                      >
+                        <Play className="h-4 w-4" />
+                      </Button>
+                    )}
                     {currentTrack?.id === track.id && (
                       <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
                     )}

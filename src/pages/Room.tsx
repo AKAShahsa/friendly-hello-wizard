@@ -36,20 +36,45 @@ const Room = () => {
       currentTrack, queue, isPlaying, currentTime, volume,
       users, togglePlayPause, nextTrack, prevTrack, seek, setVolume,
       leaveRoom, messages, sendChatMessage, reactions, sendReaction, addSongByUrl,
-      joinRoom
+      joinRoom, playTrack
     } = useMusic();
+    
+    useEffect(() => {
+      console.log("Room component rendered with roomId:", roomId);
+      console.log("Current users:", users);
+      console.log("Current queue:", queue);
+      console.log("Current track:", currentTrack);
+      console.log("Current reactions:", reactions);
+    }, [roomId, users, queue, currentTrack, reactions]);
     
     // Join room on mount if roomId is available - only once
     useEffect(() => {
       if (roomId && !hasJoinedRoom) {
         const userName = localStorage.getItem("userName") || "Guest";
-        joinRoom(roomId, userName);
-        setHasJoinedRoom(true);
+        console.log(`Attempting to join room ${roomId} as ${userName}`);
+        joinRoom(roomId, userName)
+          .then(success => {
+            if (success) {
+              console.log("Successfully joined room");
+              setHasJoinedRoom(true);
+            } else {
+              console.error("Failed to join room");
+              toast({
+                title: "Room Error",
+                description: "Failed to join the room. Please try again.",
+                variant: "destructive"
+              });
+            }
+          })
+          .catch(error => {
+            console.error("Error joining room:", error);
+          });
       }
       
       // Handle room leaving on component unmount
       return () => {
         if (hasJoinedRoom) {
+          console.log("Leaving room on unmount");
           leaveRoom();
         }
       };
@@ -60,9 +85,17 @@ const Room = () => {
       navigate("/");
     }, [leaveRoom, navigate]);
 
+    // Handle play track from queue
+    const handlePlayTrackFromQueue = useCallback((track) => {
+      console.log("Playing track from queue:", track);
+      playTrack(track);
+    }, [playTrack]);
+
     // Memoize to prevent unnecessary re-renders
     const activeUsers = useMemo(() => {
-      return users.filter(user => user.isActive);
+      const active = users.filter(user => user.isActive);
+      console.log("Active users:", active);
+      return active;
     }, [users]);
     
     // Memoize component props to prevent unnecessary re-renders
@@ -134,6 +167,7 @@ const Room = () => {
             onOpenChange={setIsQueueOpen} 
             queue={queue} 
             currentTrack={currentTrack}
+            onPlayTrack={handlePlayTrackFromQueue}
           />
 
           {/* Users Sheet */}

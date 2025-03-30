@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { ref, push, update, increment, onValue } from "firebase/database";
+import { ref, push, update, increment, onValue, set } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
 import { socket } from "@/lib/socket";
 import { Reaction, ChatMessage } from "@/types/music";
@@ -69,13 +69,20 @@ export const useCommunication = (roomId: string | null, userId: string) => {
         if (snapshot.exists()) {
           const reactionsData = snapshot.val();
           const newReactions = {
-            thumbsUp: reactionsData.thumbsUp || 0,
-            heart: reactionsData.heart || 0,
-            smile: reactionsData.smile || 0
+            thumbsUp: parseInt(reactionsData.thumbsUp || 0),
+            heart: parseInt(reactionsData.heart || 0),
+            smile: parseInt(reactionsData.smile || 0)
           };
           
+          console.log("Firebase reactions data:", reactionsData);
+          console.log("Parsed reactions:", newReactions);
+          
           // Only update state if reactions have changed
-          if (JSON.stringify(newReactions) !== JSON.stringify(reactionsRef.current)) {
+          if (
+            newReactions.thumbsUp !== reactionsRef.current.thumbsUp ||
+            newReactions.heart !== reactionsRef.current.heart ||
+            newReactions.smile !== reactionsRef.current.smile
+          ) {
             reactionsRef.current = newReactions;
             setReactions(newReactions);
           }
@@ -124,10 +131,23 @@ export const useCommunication = (roomId: string | null, userId: string) => {
     if (!roomId) return;
 
     try {
-      // Then update the database
+      console.log(`Updating reaction ${reactionType} in room ${roomId}`);
+      
+      // Update with direct value instead of increment to fix race conditions
       const reactionRef = ref(rtdb, `rooms/${roomId}/reactions/${reactionType}`);
-      update(reactionRef, { [".value"]: increment(1) })
+      const newValue = (reactionsRef.current[reactionType] || 0) + 1;
+      
+      set(reactionRef, newValue)
+        .then(() => {
+          console.log(`Reaction ${reactionType} updated to ${newValue}`);
+          // Update local state immediately for better UX
+          setReactions(prev => ({
+            ...prev,
+            [reactionType]: newValue
+          }));
+        })
         .catch(error => {
+          console.error("Error updating reaction:", error);
           toast({
             title: "Error sending reaction",
             description: "Your reaction could not be sent.",
