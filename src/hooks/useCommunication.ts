@@ -4,6 +4,7 @@ import { ref, push, update, increment, onValue } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
 import { socket } from "@/lib/socket";
 import { Reaction, ChatMessage } from "@/types/music";
+import { toast } from "@/hooks/use-toast";
 
 export const useCommunication = (roomId: string | null, userId: string) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -22,8 +23,10 @@ export const useCommunication = (roomId: string | null, userId: string) => {
     const messagesUnsubscribe = onValue(messagesRef, (snapshot) => {
       if (snapshot.exists()) {
         const messagesData = snapshot.val();
-        const messagesList = Object.values(messagesData);
-        setMessages(messagesList as ChatMessage[]);
+        const messagesList = Object.entries(messagesData).map(([key, value]) => {
+          return value as ChatMessage;
+        });
+        setMessages(messagesList);
       }
     });
 
@@ -55,7 +58,17 @@ export const useCommunication = (roomId: string | null, userId: string) => {
     };
     
     const messagesRef = ref(rtdb, `rooms/${roomId}/messages`);
-    push(messagesRef, message);
+    push(messagesRef, message)
+      .then(() => {
+        // Success - don't show toast to avoid toast flood
+      })
+      .catch(error => {
+        toast({
+          title: "Error sending message",
+          description: "Your message could not be sent. Please try again.",
+          variant: "destructive"
+        });
+      });
     
     socket.emit("newMessage", { roomId, message });
   };
@@ -71,7 +84,20 @@ export const useCommunication = (roomId: string | null, userId: string) => {
 
     // Then update the database
     const reactionRef = ref(rtdb, `rooms/${roomId}/reactions/${reactionType}`);
-    update(reactionRef, { [".value"]: increment(1) });
+    update(reactionRef, { [".value"]: increment(1) })
+      .catch(error => {
+        // Revert local update on error
+        setReactions(prev => ({
+          ...prev,
+          [reactionType]: Math.max((prev[reactionType] || 0) - 1, 0)
+        }));
+        
+        toast({
+          title: "Error sending reaction",
+          description: "Your reaction could not be sent.",
+          variant: "destructive"
+        });
+      });
 
     socket.emit("newReaction", { roomId, reactionType, userId });
   };

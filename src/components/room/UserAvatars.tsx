@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { memo } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -9,7 +9,8 @@ interface UserAvatarsProps {
   users: User[];
 }
 
-const UserAvatars: React.FC<UserAvatarsProps> = ({ users }) => {
+// Using memo to prevent unnecessary re-renders
+const UserAvatars: React.FC<UserAvatarsProps> = memo(({ users }) => {
   const activeUsers = users.filter(user => user.isActive);
   
   if (activeUsers.length === 0) {
@@ -35,9 +36,7 @@ const UserAvatars: React.FC<UserAvatarsProps> = ({ users }) => {
                       </AvatarFallback>
                     </Avatar>
                     <span 
-                      className={`absolute bottom-0 right-0 h-2 w-2 rounded-full ${
-                        user.isActive ? 'bg-green-500' : 'bg-gray-400'
-                      } ring-1 ring-white`} 
+                      className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-green-500 ring-1 ring-white"
                     />
                   </div>
                 </TooltipTrigger>
@@ -51,6 +50,8 @@ const UserAvatars: React.FC<UserAvatarsProps> = ({ users }) => {
       </TooltipProvider>
     </div>
   );
-};
+});
+
+UserAvatars.displayName = "UserAvatars";
 
 export default UserAvatars;

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMusic } from "@/contexts/MusicContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -33,28 +33,27 @@ const Room = () => {
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
-  // Join room on mount if roomId is available
+  // Join room on mount if roomId is available - only once
   useEffect(() => {
     if (roomId) {
       const userName = localStorage.getItem("userName") || "Guest";
       joinRoom(roomId, userName);
     }
-  }, [roomId, joinRoom]);
-
-  // Handle room leaving on component unmount
-  useEffect(() => {
+    
+    // Handle room leaving on component unmount
     return () => {
       leaveRoom();
     };
-  }, [leaveRoom]);
+  }, [roomId, joinRoom, leaveRoom]);
 
-  const handleLeaveRoom = () => {
+  const handleLeaveRoom = useCallback(() => {
     leaveRoom();
     navigate("/");
-  };
+  }, [leaveRoom, navigate]);
 
-  const activeUsers = users.filter(user => user.isActive);
-
+  // Memoize to prevent unnecessary re-renders
+  const activeUsers = useMemo(() => users.filter(user => user.isActive), [users]);
+  
   return (
     <TooltipProvider>
       <div className="min-h-screen flex flex-col bg-gradient-to-br from-background to-secondary/20">

@@ -12,30 +12,34 @@ import { MusicProvider } from "./contexts/MusicContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 
 // Create a client
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const App = () => {
   return (
-    <React.StrictMode>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <ThemeProvider>
+          <TooltipProvider>
             <MusicProvider>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/room/:roomId" element={<Room />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
               <Toaster />
-              <Sonner />
-              <BrowserRouter>
-                <Routes>
-                  <Route path="/" element={<Index />} />
-                  <Route path="/room/:roomId" element={<Room />} />
-                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </BrowserRouter>
+              <Sonner position="top-right" />
             </MusicProvider>
-          </ThemeProvider>
-        </TooltipProvider>
-      </QueryClientProvider>
-    </React.StrictMode>
+          </TooltipProvider>
+        </ThemeProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 };
 

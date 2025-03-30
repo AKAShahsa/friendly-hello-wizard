@@ -1,17 +1,10 @@
 
-import React from "react";
+import React, { memo } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Users, Crown } from "lucide-react";
-
-interface User {
-  id: string;
-  name: string;
-  isActive: boolean;
-  lastActive: number;
-  isHost?: boolean;
-}
+import { User } from "@/types/music";
 
 interface UsersSheetProps {
   isOpen: boolean;
@@ -19,7 +12,8 @@ interface UsersSheetProps {
   users: User[];
 }
 
-const UsersSheet: React.FC<UsersSheetProps> = ({ isOpen, onOpenChange, users }) => {
+// Using memo to prevent unnecessary re-renders
+const UsersSheet: React.FC<UsersSheetProps> = memo(({ isOpen, onOpenChange, users }) => {
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent side="right">
@@ -62,6 +56,8 @@ const UsersSheet: React.FC<UsersSheetProps> = ({ isOpen, onOpenChange, users }) 
       </SheetContent>
     </Sheet>
   );
-};
+});
+
+UsersSheet.displayName = "UsersSheet";
 
 export default UsersSheet;

@@ -1,28 +1,23 @@
 
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState, memo } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { MessageSquare, Send } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-
-interface Message {
-  userId: string;
-  userName: string;
-  text: string;
-  timestamp: number;
-}
+import { ChatMessage } from "@/types/music";
 
 interface ChatSheetProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  messages: Message[];
+  messages: ChatMessage[];
   sendChatMessage: (message: string) => void;
 }
 
-const ChatSheet: React.FC<ChatSheetProps> = ({ isOpen, onOpenChange, messages, sendChatMessage }) => {
-  const [message, setMessage] = React.useState("");
+// Using memo to prevent unnecessary re-renders
+const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messages, sendChatMessage }) => {
+  const [message, setMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Scroll to bottom of chat when new messages arrive
@@ -52,7 +47,7 @@ const ChatSheet: React.FC<ChatSheetProps> = ({ isOpen, onOpenChange, messages, s
               <div className="space-y-4">
                 {messages.map((msg, index) => (
                   <div 
-                    key={index}
+                    key={`${msg.userId}-${msg.timestamp}-${index}`}
                     className="flex items-start gap-3"
                   >
                     <Avatar className="h-8 w-8">
@@ -95,6 +90,8 @@ const ChatSheet: React.FC<ChatSheetProps> = ({ isOpen, onOpenChange, messages, s
       </SheetContent>
     </Sheet>
   );
-};
+});
+
+ChatSheet.displayName = "ChatSheet";
 
 export default ChatSheet;
