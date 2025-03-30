@@ -24,8 +24,25 @@ export const useCommunication = (roomId: string | null, userId: string) => {
       if (snapshot.exists()) {
         const messagesData = snapshot.val();
         const messagesList = Object.entries(messagesData).map(([key, value]) => {
-          return value as ChatMessage;
-        });
+          // Ensure value is properly typed as ChatMessage
+          const msg = value as any;
+          if (
+            msg && 
+            typeof msg.userId === 'string' && 
+            typeof msg.userName === 'string' && 
+            typeof msg.text === 'string' && 
+            typeof msg.timestamp === 'number'
+          ) {
+            return {
+              userId: msg.userId,
+              userName: msg.userName,
+              text: msg.text,
+              timestamp: msg.timestamp
+            } as ChatMessage;
+          }
+          return null;
+        }).filter(Boolean) as ChatMessage[];
+        
         setMessages(messagesList);
       }
     });
@@ -35,7 +52,11 @@ export const useCommunication = (roomId: string | null, userId: string) => {
     const reactionsUnsubscribe = onValue(reactionsRef, (snapshot) => {
       if (snapshot.exists()) {
         const reactionsData = snapshot.val();
-        setReactions(reactionsData as Reaction);
+        setReactions({
+          thumbsUp: reactionsData.thumbsUp || 0,
+          heart: reactionsData.heart || 0,
+          smile: reactionsData.smile || 0
+        });
       }
     });
 
@@ -50,7 +71,7 @@ export const useCommunication = (roomId: string | null, userId: string) => {
     
     const userName = localStorage.getItem("userName") || "Anonymous";
     
-    const message = {
+    const message: ChatMessage = {
       userId,
       userName,
       text,

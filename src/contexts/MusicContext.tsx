@@ -1,8 +1,9 @@
+
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { onValue, ref, update } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
 import { socket } from "@/lib/socket";
-import { Track, User, Reaction, MusicContextType } from "@/types/music";
+import { Track, User, Reaction, MusicContextType, ChatMessage } from "@/types/music";
 import { defaultTracks } from "@/utils/musicDefaults";
 import { useTrackPlayer } from "@/hooks/useTrackPlayer";
 import { useRoomManagement } from "@/hooks/useRoomManagement";
@@ -95,7 +96,22 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
       
       if (roomData.messages) {
-        const messagesList = Object.values(roomData.messages);
+        // Fixed: Convert and validate messages to ensure they match ChatMessage type
+        const messagesList = Object.values(roomData.messages)
+          .filter((msg: any) => {
+            return msg && 
+              typeof msg.userId === 'string' && 
+              typeof msg.userName === 'string' && 
+              typeof msg.text === 'string' && 
+              typeof msg.timestamp === 'number';
+          })
+          .map((msg: any) => ({
+            userId: msg.userId,
+            userName: msg.userName,
+            text: msg.text,
+            timestamp: msg.timestamp
+          })) as ChatMessage[];
+        
         setMessages(messagesList);
       }
 
@@ -156,8 +172,22 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
 
     socket.on("newMessage", (data) => {
-      if (data.roomId === roomId) {
-        setMessages(prev => [...prev, data.message]);
+      if (data.roomId === roomId && data.message) {
+        // Ensure message has all required properties before adding
+        if (
+          typeof data.message.userId === 'string' && 
+          typeof data.message.userName === 'string' && 
+          typeof data.message.text === 'string' && 
+          typeof data.message.timestamp === 'number'
+        ) {
+          const newMessage: ChatMessage = {
+            userId: data.message.userId,
+            userName: data.message.userName,
+            text: data.message.text,
+            timestamp: data.message.timestamp
+          };
+          setMessages(prev => [...prev, newMessage]);
+        }
       }
     });
 
