@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { onValue, ref, update } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
@@ -83,21 +82,21 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       
       if (roomData.users) {
         const usersList: User[] = Object.values(roomData.users);
+        setUsers(usersList);
         
-        const activeUsers = usersList.filter(user => {
-          const isActive = Date.now() - user.lastActive < 60000;
-          if (!isActive && user.isActive) {
+        // Update user active status
+        const currentTime = Date.now();
+        usersList.forEach(user => {
+          if (user.id !== userId && user.isActive && (currentTime - user.lastActive > 60000)) {
             const userRef = ref(rtdb, `rooms/${roomId}/users/${user.id}`);
             update(userRef, { isActive: false });
           }
-          return true;
         });
-        
-        setUsers(activeUsers);
       }
       
       if (roomData.messages) {
-        setMessages(Object.values(roomData.messages));
+        const messagesList = Object.values(roomData.messages);
+        setMessages(messagesList);
       }
 
       if (roomData.reactions) {
@@ -105,8 +104,22 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     });
     
-    return () => unsubscribe();
-  }, [roomId, currentTrack, setQueue, playTrack, setMessages, setReactions]);
+    // Keep user active
+    const keepActive = setInterval(() => {
+      if (!roomId) return;
+      
+      const userRef = ref(rtdb, `rooms/${roomId}/users/${userId}`);
+      update(userRef, {
+        lastActive: Date.now(),
+        isActive: true
+      });
+    }, 30000);
+    
+    return () => {
+      unsubscribe();
+      clearInterval(keepActive);
+    };
+  }, [roomId, currentTrack, setQueue, playTrack, setMessages, setReactions, userId]);
 
   // Socket event handlers
   useEffect(() => {
@@ -152,7 +165,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (data.roomId === roomId) {
         setReactions(prev => ({
           ...prev,
-          [data.reactionType]: prev[data.reactionType] + 1
+          [data.reactionType]: (prev[data.reactionType] || 0) + 1
         }));
       }
     });

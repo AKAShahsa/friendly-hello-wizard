@@ -63,8 +63,15 @@ export const useCommunication = (roomId: string | null, userId: string) => {
   const sendReaction = (reactionType: keyof Reaction) => {
     if (!roomId) return;
 
+    // First update the local state to provide immediate feedback
+    setReactions(prev => ({
+      ...prev,
+      [reactionType]: (prev[reactionType] || 0) + 1
+    }));
+
+    // Then update the database
     const reactionRef = ref(rtdb, `rooms/${roomId}/reactions/${reactionType}`);
-    update(reactionRef, { ".value": increment(1) });
+    update(reactionRef, { [".value"]: increment(1) });
 
     socket.emit("newReaction", { roomId, reactionType, userId });
   };

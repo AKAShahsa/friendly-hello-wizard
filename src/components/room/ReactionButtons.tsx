@@ -32,7 +32,7 @@ const ReactionButtons: React.FC<ReactionButtonsProps> = ({ reactions, sendReacti
       confetti({
         particleCount: 60,
         spread: 100,
-        shapes: ['heart'],
+        shapes: ['circle'],
         colors: ['#ff0000', '#ff69b4', '#ff1493']
       });
     } else if (lastTriggered === "smile") {

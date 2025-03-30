@@ -4,16 +4,19 @@ import { ref, update, set } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
 import { toast } from "@/hooks/use-toast";
 import { Track } from "@/types/music";
+import { socket } from "@/lib/socket";
 
 export const useQueue = (roomId: string | null, playTrackFn: (track: Track) => void) => {
   const [queue, setQueue] = useState<Track[]>([]);
 
   const addToQueue = (track: Track) => {
+    // Add track to local queue
     setQueue(prev => [...prev, track]);
     
+    // If room exists, update Firebase
     if (roomId) {
-      const queueRef = ref(rtdb, `rooms/${roomId}/queue`);
-      update(queueRef, { [track.id]: track });
+      const queueRef = ref(rtdb, `rooms/${roomId}/queue/${track.id}`);
+      set(queueRef, track);
     }
     
     toast({
@@ -82,6 +85,11 @@ export const useQueue = (roomId: string | null, playTrackFn: (track: Track) => v
 
     addToQueue(newTrack);
     
+    // If no tracks are playing, start playing this one
+    if (queue.length === 0) {
+      playTrackFn(newTrack);
+    }
+    
     toast({
       title: "Song added",
       description: `Added "${suggestedTitle}" to the queue`
@@ -100,6 +108,3 @@ export const useQueue = (roomId: string | null, playTrackFn: (track: Track) => v
     addSongByUrl
   };
 };
-
-// Add the missing import
-import { socket } from "@/lib/socket";

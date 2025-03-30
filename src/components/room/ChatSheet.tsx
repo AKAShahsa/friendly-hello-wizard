@@ -40,8 +40,6 @@ const ChatSheet: React.FC<ChatSheetProps> = ({ isOpen, onOpenChange, messages, s
     }
   };
 
-  console.log("Messages in ChatSheet:", messages); // Debug log
-
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent side="left" className="flex flex-col p-0">

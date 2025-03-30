@@ -41,6 +41,11 @@ export const useRoomManagement = (
     
     socket.emit("joinRoom", { roomId: newRoomId, userId });
     
+    toast({
+      title: "Room created",
+      description: "You have successfully created a new room"
+    });
+    
     return newRoomId;
   };
 
@@ -86,6 +91,11 @@ export const useRoomManagement = (
     }
     
     socket.emit("joinRoom", { roomId, userId });
+    
+    toast({
+      title: "Room joined",
+      description: "You have successfully joined the room"
+    });
     
     return true;
   };

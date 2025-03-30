@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMusic } from "@/contexts/MusicContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 // Import components
 import RoomHeader from "@/components/room/RoomHeader";
@@ -21,7 +22,8 @@ const Room = () => {
   const { 
     currentTrack, queue, isPlaying, currentTime, volume,
     users, togglePlayPause, nextTrack, prevTrack, seek, setVolume,
-    leaveRoom, messages, sendChatMessage, reactions, sendReaction, addSongByUrl
+    leaveRoom, messages, sendChatMessage, reactions, sendReaction, addSongByUrl,
+    joinRoom
   } = useMusic();
   
   const [isUsersOpen, setIsUsersOpen] = useState(false);
@@ -30,6 +32,14 @@ const Room = () => {
   const [isAddSongOpen, setIsAddSongOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
+
+  // Join room on mount if roomId is available
+  useEffect(() => {
+    if (roomId) {
+      const userName = localStorage.getItem("userName") || "Guest";
+      joinRoom(roomId, userName);
+    }
+  }, [roomId, joinRoom]);
 
   // Handle room leaving on component unmount
   useEffect(() => {
@@ -46,81 +56,83 @@ const Room = () => {
   const activeUsers = users.filter(user => user.isActive);
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-background to-secondary/20">
-      {/* Header */}
-      <RoomHeader 
-        roomId={roomId} 
-        theme={theme} 
-        toggleTheme={toggleTheme} 
-      />
-
-      {/* User Avatars - horizontal scrollable list of users */}
-      <UserAvatars users={users} />
-
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col items-center justify-center p-4 md:p-8">
-        {/* Album Art and Track Info */}
-        <TrackDisplay currentTrack={currentTrack} />
-
-        {/* Reaction Buttons */}
-        <ReactionButtons reactions={reactions} sendReaction={sendReaction} />
-
-        {/* Player Controls */}
-        <PlayerControls 
-          currentTrack={currentTrack}
-          isPlaying={isPlaying}
-          currentTime={currentTime}
-          volume={volume}
-          togglePlayPause={togglePlayPause}
-          nextTrack={nextTrack}
-          prevTrack={prevTrack}
-          seek={seek}
-          setVolume={setVolume}
+    <TooltipProvider>
+      <div className="min-h-screen flex flex-col bg-gradient-to-br from-background to-secondary/20">
+        {/* Header */}
+        <RoomHeader 
+          roomId={roomId} 
+          theme={theme} 
+          toggleTheme={toggleTheme} 
         />
-      </main>
 
-      {/* Sidebar Triggers */}
-      <RoomFooter 
-        setIsQueueOpen={setIsQueueOpen}
-        setIsChatOpen={setIsChatOpen}
-        setIsUsersOpen={setIsUsersOpen}
-        setIsAddSongOpen={setIsAddSongOpen}
-        handleLeaveRoom={handleLeaveRoom}
-        queueLength={queue.length}
-        messagesLength={messages.length}
-        activeUsersLength={activeUsers.length}
-      />
+        {/* User Avatars - horizontal scrollable list of users */}
+        <UserAvatars users={users} />
 
-      {/* Queue Sheet */}
-      <QueueSheet 
-        isOpen={isQueueOpen} 
-        onOpenChange={setIsQueueOpen} 
-        queue={queue} 
-        currentTrack={currentTrack}
-      />
+        {/* Main Content */}
+        <main className="flex-1 flex flex-col items-center justify-center p-4 md:p-8">
+          {/* Album Art and Track Info */}
+          <TrackDisplay currentTrack={currentTrack} />
 
-      {/* Users Sheet */}
-      <UsersSheet 
-        isOpen={isUsersOpen} 
-        onOpenChange={setIsUsersOpen} 
-        users={users}
-      />
+          {/* Reaction Buttons */}
+          <ReactionButtons reactions={reactions} sendReaction={sendReaction} />
 
-      {/* Chat Sheet */}
-      <ChatSheet 
-        isOpen={isChatOpen} 
-        onOpenChange={setIsChatOpen} 
-        messages={messages}
-        sendChatMessage={sendChatMessage}
-      />
+          {/* Player Controls */}
+          <PlayerControls 
+            currentTrack={currentTrack}
+            isPlaying={isPlaying}
+            currentTime={currentTime}
+            volume={volume}
+            togglePlayPause={togglePlayPause}
+            nextTrack={nextTrack}
+            prevTrack={prevTrack}
+            seek={seek}
+            setVolume={setVolume}
+          />
+        </main>
 
-      {/* Add Song Sheet */}
-      <AddSongSheet 
-        isOpen={isAddSongOpen} 
-        onOpenChange={setIsAddSongOpen} 
-        addSongByUrl={addSongByUrl}
-      />
-    </div>
+        {/* Sidebar Triggers */}
+        <RoomFooter 
+          setIsQueueOpen={setIsQueueOpen}
+          setIsChatOpen={setIsChatOpen}
+          setIsUsersOpen={setIsUsersOpen}
+          setIsAddSongOpen={setIsAddSongOpen}
+          handleLeaveRoom={handleLeaveRoom}
+          queueLength={queue.length}
+          messagesLength={messages.length}
+          activeUsersLength={activeUsers.length}
+        />
+
+        {/* Queue Sheet */}
+        <QueueSheet 
+          isOpen={isQueueOpen} 
+          onOpenChange={setIsQueueOpen} 
+          queue={queue} 
+          currentTrack={currentTrack}
+        />
+
+        {/* Users Sheet */}
+        <UsersSheet 
+          isOpen={isUsersOpen} 
+          onOpenChange={setIsUsersOpen} 
+          users={users}
+        />
+
+        {/* Chat Sheet */}
+        <ChatSheet 
+          isOpen={isChatOpen} 
+          onOpenChange={setIsChatOpen} 
+          messages={messages}
+          sendChatMessage={sendChatMessage}
+        />
+
+        {/* Add Song Sheet */}
+        <AddSongSheet 
+          isOpen={isAddSongOpen} 
+          onOpenChange={setIsAddSongOpen} 
+          addSongByUrl={addSongByUrl}
+        />
+      </div>
+    </TooltipProvider>
   );
 };
 
