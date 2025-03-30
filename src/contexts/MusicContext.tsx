@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { onValue, ref, update } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
@@ -23,7 +22,6 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem("userId", userId);
   }, [userId]);
 
-  // Initialize our custom hooks
   const {
     currentTrack, isPlaying, currentTime, setCurrentTime,
     playTrack, togglePlayPause, seek, setVolume: setHowlerVolume, setupTimeTracking
@@ -46,7 +44,6 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setReactions, setQueue, (track) => track ? playTrack(track) : null
   );
 
-  // Wrapper functions
   const nextTrack = () => queueNextTrack(currentTrack);
   const prevTrack = () => queuePrevTrack(currentTrack);
   const setVolume = (newVolume: number) => {
@@ -55,13 +52,11 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
   const leaveRoom = () => leaveRoomFn(roomId);
 
-  // Time tracking effect
   useEffect(() => {
     const cleanup = setupTimeTracking(setCurrentTime);
     return cleanup;
   }, [setupTimeTracking, setCurrentTime]);
 
-  // Room data effect
   useEffect(() => {
     if (!roomId) return;
     
@@ -71,21 +66,21 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (!roomData) return;
       
       if (roomData.queue) {
-        setQueue(Object.values(roomData.queue));
+        const queueTracks = Object.values(roomData.queue) as Track[];
+        setQueue(queueTracks);
       }
       
       if (roomData.currentTrack) {
-        const newTrack = roomData.currentTrack;
+        const newTrack = roomData.currentTrack as Track;
         if (!currentTrack || currentTrack.id !== newTrack.id) {
           playTrack(newTrack);
         }
       }
       
       if (roomData.users) {
-        const usersList: User[] = Object.values(roomData.users);
+        const usersList = Object.values(roomData.users) as User[];
         setUsers(usersList);
         
-        // Update user active status
         const currentTime = Date.now();
         usersList.forEach(user => {
           if (user.id !== userId && user.isActive && (currentTime - user.lastActive > 60000)) {
@@ -96,31 +91,38 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
       
       if (roomData.messages) {
-        // Fixed: Convert and validate messages to ensure they match ChatMessage type
-        const messagesList = Object.values(roomData.messages)
-          .filter((msg: any) => {
-            return msg && 
-              typeof msg.userId === 'string' && 
-              typeof msg.userName === 'string' && 
-              typeof msg.text === 'string' && 
-              typeof msg.timestamp === 'number';
-          })
-          .map((msg: any) => ({
-            userId: msg.userId,
-            userName: msg.userName,
-            text: msg.text,
-            timestamp: msg.timestamp
-          })) as ChatMessage[];
-        
-        setMessages(messagesList);
+        try {
+          const messagesList = Object.values(roomData.messages)
+            .filter((msg: any) => {
+              return msg && 
+                typeof msg.userId === 'string' && 
+                typeof msg.userName === 'string' && 
+                typeof msg.text === 'string' && 
+                typeof msg.timestamp === 'number';
+            })
+            .map((msg: any) => ({
+              userId: msg.userId,
+              userName: msg.userName,
+              text: msg.text,
+              timestamp: msg.timestamp
+            })) as ChatMessage[];
+          
+          setMessages(messagesList);
+        } catch (error) {
+          console.error("Error processing messages:", error);
+        }
       }
 
       if (roomData.reactions) {
-        setReactions(roomData.reactions);
+        try {
+          const reactionsData = roomData.reactions as Reaction;
+          setReactions(reactionsData);
+        } catch (error) {
+          console.error("Error processing reactions:", error);
+        }
       }
     });
     
-    // Keep user active
     const keepActive = setInterval(() => {
       if (!roomId) return;
       
@@ -137,7 +139,6 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, [roomId, currentTrack, setQueue, playTrack, setMessages, setReactions, userId]);
 
-  // Socket event handlers
   useEffect(() => {
     if (!roomId) return;
 
@@ -173,20 +174,23 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     socket.on("newMessage", (data) => {
       if (data.roomId === roomId && data.message) {
-        // Ensure message has all required properties before adding
-        if (
-          typeof data.message.userId === 'string' && 
-          typeof data.message.userName === 'string' && 
-          typeof data.message.text === 'string' && 
-          typeof data.message.timestamp === 'number'
-        ) {
-          const newMessage: ChatMessage = {
-            userId: data.message.userId,
-            userName: data.message.userName,
-            text: data.message.text,
-            timestamp: data.message.timestamp
-          };
-          setMessages(prev => [...prev, newMessage]);
+        try {
+          if (
+            typeof data.message.userId === 'string' && 
+            typeof data.message.userName === 'string' && 
+            typeof data.message.text === 'string' && 
+            typeof data.message.timestamp === 'number'
+          ) {
+            const newMessage: ChatMessage = {
+              userId: data.message.userId,
+              userName: data.message.userName,
+              text: data.message.text,
+              timestamp: data.message.timestamp
+            };
+            setMessages(prev => [...prev, newMessage]);
+          }
+        } catch (error) {
+          console.error("Error processing new message:", error);
         }
       }
     });
@@ -211,32 +215,34 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, [roomId, isPlaying, togglePlayPause, seek, nextTrack, prevTrack, setMessages]);
 
+  const contextValue: MusicContextType = {
+    currentTrack,
+    queue,
+    isPlaying,
+    currentTime,
+    volume,
+    users,
+    roomId,
+    reactions,
+    messages: messages || [],
+    createRoom,
+    joinRoom,
+    leaveRoom,
+    addToQueue,
+    removeFromQueue,
+    playTrack,
+    togglePlayPause,
+    nextTrack,
+    prevTrack,
+    seek,
+    setVolume,
+    sendChatMessage,
+    sendReaction,
+    addSongByUrl
+  };
+
   return (
-    <MusicContext.Provider value={{
-      currentTrack,
-      queue,
-      isPlaying,
-      currentTime,
-      volume,
-      users,
-      roomId,
-      reactions,
-      createRoom,
-      joinRoom,
-      leaveRoom,
-      addToQueue,
-      removeFromQueue,
-      playTrack,
-      togglePlayPause,
-      nextTrack,
-      prevTrack,
-      seek,
-      setVolume,
-      sendChatMessage,
-      sendReaction,
-      addSongByUrl,
-      messages
-    }}>
+    <MusicContext.Provider value={contextValue}>
       {children}
     </MusicContext.Provider>
   );

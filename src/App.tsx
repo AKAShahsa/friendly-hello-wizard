@@ -26,8 +26,8 @@ const App = () => {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <ThemeProvider>
-          <TooltipProvider>
-            <MusicProvider>
+          <MusicProvider>
+            <TooltipProvider>
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/room/:roomId" element={<Room />} />
@@ -35,8 +35,8 @@ const App = () => {
               </Routes>
               <Toaster />
               <Sonner position="top-right" />
-            </MusicProvider>
-          </TooltipProvider>
+            </TooltipProvider>
+          </MusicProvider>
         </ThemeProvider>
       </BrowserRouter>
     </QueryClientProvider>
