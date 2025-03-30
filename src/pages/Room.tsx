@@ -4,7 +4,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useMusic } from "@/contexts/MusicContext";
 import { useTheme } from "@/contexts/ThemeContext";
 
-// Import our new component
+// Import components
 import RoomHeader from "@/components/room/RoomHeader";
 import TrackDisplay from "@/components/room/TrackDisplay";
 import ReactionButtons from "@/components/room/ReactionButtons";
@@ -14,6 +14,7 @@ import QueueSheet from "@/components/room/QueueSheet";
 import UsersSheet from "@/components/room/UsersSheet";
 import ChatSheet from "@/components/room/ChatSheet";
 import AddSongSheet from "@/components/room/AddSongSheet";
+import UserAvatars from "@/components/room/UserAvatars";
 
 const Room = () => {
   const { roomId } = useParams<{ roomId: string }>();
@@ -52,6 +53,9 @@ const Room = () => {
         theme={theme} 
         toggleTheme={toggleTheme} 
       />
+
+      {/* User Avatars - horizontal scrollable list of users */}
+      <UserAvatars users={users} />
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col items-center justify-center p-4 md:p-8">

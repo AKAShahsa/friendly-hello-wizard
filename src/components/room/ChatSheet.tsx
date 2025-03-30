@@ -5,6 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { MessageSquare, Send } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 interface Message {
   userId: string;
@@ -26,10 +27,10 @@ const ChatSheet: React.FC<ChatSheetProps> = ({ isOpen, onOpenChange, messages, s
 
   // Scroll to bottom of chat when new messages arrive
   useEffect(() => {
-    if (messagesEndRef.current) {
+    if (messagesEndRef.current && isOpen) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages]);
+  }, [messages, isOpen]);
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,26 +40,37 @@ const ChatSheet: React.FC<ChatSheetProps> = ({ isOpen, onOpenChange, messages, s
     }
   };
 
+  console.log("Messages in ChatSheet:", messages); // Debug log
+
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent side="left">
+      <SheetContent side="left" className="flex flex-col p-0">
         <div className="h-full flex flex-col">
-          <h2 className="text-xl font-semibold mb-4">Chat</h2>
-          <ScrollArea className="flex-1 mb-4">
-            {messages.length > 0 ? (
-              <div className="space-y-3">
+          <div className="p-4 border-b">
+            <h2 className="text-xl font-semibold">Chat</h2>
+          </div>
+          <ScrollArea className="flex-1 p-4">
+            {messages && messages.length > 0 ? (
+              <div className="space-y-4">
                 {messages.map((msg, index) => (
                   <div 
                     key={index}
-                    className="flex flex-col"
+                    className="flex items-start gap-3"
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{msg.userName}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(msg.timestamp).toLocaleTimeString()}
-                      </span>
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className="text-xs">
+                        {msg.userName.substring(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{msg.userName}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(msg.timestamp).toLocaleTimeString()}
+                        </span>
+                      </div>
+                      <p className="mt-1">{msg.text}</p>
                     </div>
-                    <p className="pl-2 py-1">{msg.text}</p>
                   </div>
                 ))}
                 <div ref={messagesEndRef} />
@@ -70,7 +82,7 @@ const ChatSheet: React.FC<ChatSheetProps> = ({ isOpen, onOpenChange, messages, s
               </div>
             )}
           </ScrollArea>
-          <form onSubmit={handleSendMessage} className="flex gap-2">
+          <form onSubmit={handleSendMessage} className="p-4 border-t flex gap-2">
             <Input
               value={message}
               onChange={(e) => setMessage(e.target.value)}
