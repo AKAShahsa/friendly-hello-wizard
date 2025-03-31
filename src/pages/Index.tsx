@@ -16,8 +16,32 @@ const Index = () => {
   const [roomId, setRoomIdInput] = useState("");
   const [activeTab, setActiveTab] = useState("create");
   
-  // Access music context
-  const musicContext = useMusic();
+  // Use try/catch to gracefully handle missing context
+  let musicContext;
+  try {
+    musicContext = useMusic();
+  } catch (error) {
+    console.error("Error accessing music context:", error);
+    // Handle missing context gracefully
+    musicContext = {
+      createRoom: async () => {
+        toast({
+          title: "Error",
+          description: "Music service unavailable. Please try again later.",
+          variant: "destructive"
+        });
+        return "";
+      },
+      joinRoom: async () => {
+        toast({
+          title: "Error",
+          description: "Music service unavailable. Please try again later.",
+          variant: "destructive"
+        });
+        return false;
+      }
+    };
+  }
   
   useEffect(() => {
     const storedName = localStorage.getItem("userName");
