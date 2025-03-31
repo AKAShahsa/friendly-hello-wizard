@@ -1,6 +1,5 @@
-
 import { useState } from "react";
-import { ref, set, push, update, get } from "firebase/database";
+import { ref, set, push, update, get, onDisconnect } from "firebase/database";
 import { db, rtdb } from "@/lib/firebase";
 import { toast } from "@/hooks/use-toast";
 import { socket } from "@/lib/socket";
@@ -16,6 +15,8 @@ export const useRoomManagement = (
   setQueue: (queue: Track[]) => void,
   setCurrentTrack: (track: Track | null) => void
 ) => {
+  const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
+
   const createRoom = async (name: string): Promise<string> => {
     try {
       const newRoomRef = push(ref(rtdb, 'rooms'));
@@ -38,6 +39,13 @@ export const useRoomManagement = (
         reactions: defaultReactions
       });
       
+      const userStatusRef = ref(rtdb, `rooms/${newRoomId}/users/${userId}`);
+      onDisconnect(userStatusRef).update({
+        isActive: false,
+        lastActive: Date.now()
+      });
+      
+      setCurrentRoomId(newRoomId);
       setRoomId(newRoomId);
       
       socket.emit("joinRoom", { roomId: newRoomId, userId });
@@ -61,6 +69,10 @@ export const useRoomManagement = (
 
   const joinRoom = async (roomId: string, userName: string): Promise<boolean> => {
     try {
+      if (currentRoomId && currentRoomId !== roomId) {
+        await leaveRoomInternal(currentRoomId, false);
+      }
+      
       const roomRef = ref(rtdb, `rooms/${roomId}`);
       const snapshot = await get(roomRef);
       
@@ -75,24 +87,26 @@ export const useRoomManagement = (
       
       const roomData = snapshot.val();
       
-      // Check if user is already in the room
       const isExistingUser = roomData.users && roomData.users[userId];
-      // Preserve host status if user is rejoining
       const isHost = isExistingUser && roomData.users[userId].isHost === true;
       
-      // Always ensure user is active when joining
-      await set(ref(rtdb, `rooms/${roomId}/users/${userId}`), {
+      const userRef = ref(rtdb, `rooms/${roomId}/users/${userId}`);
+      await set(userRef, {
         id: userId,
         name: userName,
         isActive: true,
         lastActive: Date.now(),
-        isHost: isHost || (roomData.createdBy === userId) // Make sure creator is always host
+        isHost: isHost || (roomData.createdBy === userId)
       });
       
-      // Update the room ID in the local state
+      onDisconnect(userRef).update({
+        isActive: false,
+        lastActive: Date.now()
+      });
+      
+      setCurrentRoomId(roomId);
       setRoomId(roomId);
       
-      // Update all the other data
       if (roomData.queue) {
         setQueue(Object.values(roomData.queue));
       }
@@ -109,7 +123,6 @@ export const useRoomManagement = (
         setReactions(roomData.reactions);
       }
       
-      // Join the socket room
       socket.emit("joinRoom", { roomId, userId });
       
       toast({
@@ -129,29 +142,53 @@ export const useRoomManagement = (
     }
   };
 
-  const leaveRoom = (roomId: string | null) => {
+  const leaveRoomInternal = async (roomId: string, showToast: boolean = true) => {
     if (!roomId) return;
     
     try {
       const userRef = ref(rtdb, `rooms/${roomId}/users/${userId}`);
-      update(userRef, {
+      await update(userRef, {
         isActive: false,
         lastActive: Date.now()
       });
       
       socket.emit("leaveRoom", { roomId, userId });
       
-      setRoomId(null);
-      setUsers([]);
-      setMessages([]);
+      if (currentRoomId === roomId) {
+        setCurrentRoomId(null);
+      }
       
-      toast({
-        title: "Left room",
-        description: "You have successfully left the room"
-      });
+      if (showToast) {
+        toast({
+          title: "Left room",
+          description: "You have successfully left the room"
+        });
+      }
     } catch (error) {
       console.error("Error leaving room:", error);
+      if (showToast) {
+        toast({
+          title: "Error",
+          description: "Failed to leave room",
+          variant: "destructive"
+        });
+      }
     }
+  };
+
+  const leaveRoom = () => {
+    if (!currentRoomId) return;
+    
+    const roomIdToLeave = currentRoomId;
+    
+    setRoomId(null);
+    setUsers([]);
+    setMessages([]);
+    setReactions(defaultReactions);
+    setQueue([]);
+    setCurrentTrack(null);
+    
+    leaveRoomInternal(roomIdToLeave);
   };
 
   return {
