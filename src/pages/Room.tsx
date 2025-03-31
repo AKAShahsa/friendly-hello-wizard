@@ -73,7 +73,7 @@ const Room = () => {
       
       // Handle room leaving on component unmount
       return () => {
-        if (hasJoinedRoom) {
+        if (hasJoinedRoom && roomId) {
           console.log("Leaving room on unmount");
           leaveRoom();
         }
@@ -93,9 +93,7 @@ const Room = () => {
 
     // Memoize to prevent unnecessary re-renders
     const activeUsers = useMemo(() => {
-      const active = users.filter(user => user.isActive);
-      console.log("Active users:", active);
-      return active;
+      return users.filter(user => user.isActive);
     }, [users]);
     
     // Memoize component props to prevent unnecessary re-renders

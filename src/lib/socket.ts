@@ -21,7 +21,11 @@ socket.on("error", (error) => {
   console.error("Socket error:", error);
 });
 
-// Add handler for room leaving event
+// Add handler for room events
 socket.on("userLeft", (data) => {
   console.log("User left the room:", data);
+});
+
+socket.on("userJoined", (data) => {
+  console.log("User joined the room:", data);
 });

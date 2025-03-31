@@ -11,13 +11,10 @@ interface UserAvatarsProps {
 
 // Using memo to prevent unnecessary re-renders
 const UserAvatars: React.FC<UserAvatarsProps> = memo(({ users }) => {
-  // Filter active users or include all users if none are active
-  const activeUsers = users.filter(user => user.isActive);
-  
   useEffect(() => {
     console.log("Users in UserAvatars:", users);
-    console.log("Active users in UserAvatars:", activeUsers);
-  }, [users, activeUsers]);
+    console.log("Active users in UserAvatars:", users.filter(user => user.isActive));
+  }, [users]);
 
   if (users.length === 0) {
     return (

@@ -77,15 +77,16 @@ export const useRoomManagement = (
       
       // Check if user is already in the room
       const isExistingUser = roomData.users && roomData.users[userId];
+      // Preserve host status if user is rejoining
       const isHost = isExistingUser && roomData.users[userId].isHost === true;
       
-      // Update user data
+      // Always set user as active when joining
       await set(ref(rtdb, `rooms/${roomId}/users/${userId}`), {
         id: userId,
         name: userName,
         isActive: true,
         lastActive: Date.now(),
-        isHost: isHost || false
+        isHost: isHost || (roomData.createdBy === userId) // Make sure creator is always host
       });
       
       // Update the room ID in the local state
