@@ -11,16 +11,18 @@ interface UserAvatarsProps {
 
 // Using memo to prevent unnecessary re-renders
 const UserAvatars: React.FC<UserAvatarsProps> = memo(({ users }) => {
+  // Filter active users or include all users if none are active
   const activeUsers = users.filter(user => user.isActive);
   
   useEffect(() => {
+    console.log("Users in UserAvatars:", users);
     console.log("Active users in UserAvatars:", activeUsers);
-  }, [activeUsers]);
+  }, [users, activeUsers]);
 
-  if (activeUsers.length === 0) {
+  if (users.length === 0) {
     return (
       <div className="py-2 flex justify-center">
-        <p className="text-sm text-muted-foreground">No active users</p>
+        <p className="text-sm text-muted-foreground">No users in room</p>
       </div>
     );
   }
@@ -30,7 +32,7 @@ const UserAvatars: React.FC<UserAvatarsProps> = memo(({ users }) => {
       <TooltipProvider>
         <ScrollArea className="w-full">
           <div className="flex space-x-2 px-4">
-            {activeUsers.map((user) => (
+            {users.map((user) => (
               <Tooltip key={user.id}>
                 <TooltipTrigger asChild>
                   <div className="relative flex-shrink-0">
@@ -40,7 +42,9 @@ const UserAvatars: React.FC<UserAvatarsProps> = memo(({ users }) => {
                       </AvatarFallback>
                     </Avatar>
                     <span 
-                      className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-green-500 ring-1 ring-white"
+                      className={`absolute bottom-0 right-0 h-2 w-2 rounded-full ${
+                        user.isActive ? 'bg-green-500' : 'bg-gray-400'
+                      } ring-1 ring-white`}
                     />
                   </div>
                 </TooltipTrigger>

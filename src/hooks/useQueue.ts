@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { ref, update, set, get } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
@@ -70,7 +71,7 @@ export const useQueue = (roomId: string | null, playTrackFn: (track: Track) => v
   };
 
   const nextTrack = (currentTrack: Track | null) => {
-    if (!currentTrack || queue.length === 0) return;
+    if (!currentTrack || queue.length === 0) return null;
     
     const currentIndex = queue.findIndex(track => track.id === currentTrack.id);
     console.log("Current track index:", currentIndex, "Queue length:", queue.length);
@@ -90,13 +91,16 @@ export const useQueue = (roomId: string | null, playTrackFn: (track: Track) => v
             console.error("Error updating next track:", error);
           });
       }
+      
+      return nextTrack;
     } else {
       console.log("No next track available");
+      return null;
     }
   };
 
   const prevTrack = (currentTrack: Track | null) => {
-    if (!currentTrack || queue.length === 0) return;
+    if (!currentTrack || queue.length === 0) return null;
     
     const currentIndex = queue.findIndex(track => track.id === currentTrack.id);
     console.log("Current track index (prev):", currentIndex);
@@ -116,8 +120,11 @@ export const useQueue = (roomId: string | null, playTrackFn: (track: Track) => v
             console.error("Error updating previous track:", error);
           });
       }
+      
+      return prevTrack;
     } else {
       console.log("No previous track available");
+      return null;
     }
   };
 

@@ -63,6 +63,13 @@ const ReactionButtons: React.FC<ReactionButtonsProps> = ({ reactions, sendReacti
     try {
       sendReaction(type);
       setLastTriggered(type);
+      
+      // Apply optimistic update to ensure the UI updates immediately
+      const reactionElement = document.querySelector(`#reaction-count-${type}`);
+      if (reactionElement) {
+        const currentCount = parseInt(reactionElement.textContent || "0");
+        reactionElement.textContent = (currentCount + 1).toString();
+      }
     } catch (error) {
       console.error(`Error sending ${type} reaction:`, error);
       toast({
@@ -81,7 +88,7 @@ const ReactionButtons: React.FC<ReactionButtonsProps> = ({ reactions, sendReacti
         className="flex flex-col items-center"
       >
         <ThumbsUp className="h-5 w-5" />
-        <span className="text-xs mt-1">{reactions.thumbsUp || 0}</span>
+        <span id="reaction-count-thumbsUp" className="text-xs mt-1">{reactions.thumbsUp || 0}</span>
       </Button>
       <Button 
         variant="outline" 
@@ -89,7 +96,7 @@ const ReactionButtons: React.FC<ReactionButtonsProps> = ({ reactions, sendReacti
         className="flex flex-col items-center"
       >
         <Heart className="h-5 w-5" />
-        <span className="text-xs mt-1">{reactions.heart || 0}</span>
+        <span id="reaction-count-heart" className="text-xs mt-1">{reactions.heart || 0}</span>
       </Button>
       <Button 
         variant="outline" 
@@ -97,7 +104,7 @@ const ReactionButtons: React.FC<ReactionButtonsProps> = ({ reactions, sendReacti
         className="flex flex-col items-center"
       >
         <Smile className="h-5 w-5" />
-        <span className="text-xs mt-1">{reactions.smile || 0}</span>
+        <span id="reaction-count-smile" className="text-xs mt-1">{reactions.smile || 0}</span>
       </Button>
     </div>
   );
