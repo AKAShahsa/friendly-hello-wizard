@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { onValue, ref, update, get } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
@@ -9,7 +10,34 @@ import { useRoomManagement } from "@/hooks/useRoomManagement";
 import { useQueue } from "@/hooks/useQueue";
 import { useCommunication } from "@/hooks/useCommunication";
 
-const MusicContext = createContext<MusicContextType | undefined>(undefined);
+// Create a default context value to prevent "undefined" errors
+const defaultContextValue: MusicContextType = {
+  currentTrack: null,
+  queue: [],
+  isPlaying: false,
+  currentTime: 0,
+  volume: 0.7,
+  users: [],
+  roomId: null,
+  reactions: { thumbsUp: 0, heart: 0, smile: 0 },
+  messages: [],
+  createRoom: async () => "",
+  joinRoom: async () => false,
+  leaveRoom: () => {},
+  addToQueue: () => {},
+  removeFromQueue: () => {},
+  playTrack: () => {},
+  togglePlayPause: () => {},
+  nextTrack: () => {},
+  prevTrack: () => {},
+  seek: () => {},
+  setVolume: () => {},
+  sendChatMessage: () => {},
+  sendReaction: () => {},
+  addSongByUrl: async () => false
+};
+
+const MusicContext = createContext<MusicContextType>(defaultContextValue);
 
 export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [users, setUsers] = useState<User[]>([]);
@@ -263,7 +291,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
 export const useMusic = (): MusicContextType => {
   const context = useContext(MusicContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error("useMusic must be used within a MusicProvider");
   }
   return context;

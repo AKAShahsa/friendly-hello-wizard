@@ -80,7 +80,7 @@ export const useRoomManagement = (
       // Preserve host status if user is rejoining
       const isHost = isExistingUser && roomData.users[userId].isHost === true;
       
-      // Set user as active when joining
+      // Always ensure user is active when joining
       await set(ref(rtdb, `rooms/${roomId}/users/${userId}`), {
         id: userId,
         name: userName,
