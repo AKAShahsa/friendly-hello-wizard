@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { onValue, ref, update } from "firebase/database";
+import { onValue, ref, update, get } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
 import { socket } from "@/lib/socket";
 import { Track, User, Reaction, MusicContextType, ChatMessage } from "@/types/music";
@@ -86,6 +86,19 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           if (user.id !== userId && user.isActive && (currentTime - user.lastActive > 60000)) {
             const userRef = ref(rtdb, `rooms/${roomId}/users/${user.id}`);
             update(userRef, { isActive: false });
+          }
+        });
+        
+        const currentUserRef = ref(rtdb, `rooms/${roomId}/users/${userId}`);
+        get(currentUserRef).then(snapshot => {
+          if (snapshot.exists()) {
+            const userData = snapshot.val();
+            if (!userData.isActive) {
+              update(currentUserRef, { 
+                isActive: true, 
+                lastActive: Date.now() 
+              });
+            }
           }
         });
       }
