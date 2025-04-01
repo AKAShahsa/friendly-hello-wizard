@@ -42,6 +42,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [users, setUsers] = useState<User[]>([]);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [volume, setVolumeState] = useState(0.7);
+  const [currentTrackState, setCurrentTrackState] = useState<Track | null>(null);
 
   const userId = localStorage.getItem("userId") || `user_${Math.random().toString(36).substring(2, 9)}`;
   
@@ -68,7 +69,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     createRoom, joinRoom, leaveRoom: leaveRoomFn
   } = useRoomManagement(
     userId, setRoomId, setUsers, setMessages, 
-    setReactions, setQueue, setCurrentTrack
+    setReactions, setQueue, setCurrentTrackState
   );
 
   const nextTrack = () => queueNextTrack(currentTrack);
@@ -78,6 +79,20 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setVolumeState(newVolume);
   };
   const leaveRoom = () => leaveRoomFn();
+
+  // Sync the local currentTrackState with the player's currentTrack
+  useEffect(() => {
+    if (currentTrack !== currentTrackState) {
+      setCurrentTrackState(currentTrack);
+    }
+  }, [currentTrack, currentTrackState]);
+
+  // When currentTrackState changes from room management, play the track
+  useEffect(() => {
+    if (currentTrackState && (!currentTrack || currentTrackState.id !== currentTrack.id)) {
+      playTrack(currentTrackState);
+    }
+  }, [currentTrackState, currentTrack, playTrack]);
 
   useEffect(() => {
     const cleanup = setupTimeTracking(setCurrentTime);
