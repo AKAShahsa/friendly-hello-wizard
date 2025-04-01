@@ -54,4 +54,5 @@ export interface MusicContextType {
   sendChatMessage: (message: string) => void;
   sendReaction: (reactionType: keyof Reaction) => void;
   addSongByUrl: (url: string, title?: string, artist?: string) => Promise<boolean>;
+  transferHostStatus: (newHostId: string) => void;
 }

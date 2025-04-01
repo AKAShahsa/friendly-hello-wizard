@@ -214,9 +214,64 @@ export const useRoomManagement = (
     leaveRoomInternal(roomIdToLeave);
   };
 
+  // New function to transfer host status
+  const transferHostStatus = async (newHostId: string) => {
+    if (!currentRoomId) return;
+    
+    try {
+      // Get current user to check if they're the host
+      const currentUserRef = ref(rtdb, `rooms/${currentRoomId}/users/${userId}`);
+      const currentUserSnapshot = await get(currentUserRef);
+      
+      if (!currentUserSnapshot.exists() || !currentUserSnapshot.val().isHost) {
+        toast({
+          title: "Permission denied",
+          description: "Only the host can transfer host status",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Get target user to check if they exist in the room
+      const targetUserRef = ref(rtdb, `rooms/${currentRoomId}/users/${newHostId}`);
+      const targetUserSnapshot = await get(targetUserRef);
+      
+      if (!targetUserSnapshot.exists()) {
+        toast({
+          title: "Error",
+          description: "User not found in the room",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Remove host status from current user
+      await update(currentUserRef, { isHost: false });
+      
+      // Add host status to new host
+      await update(targetUserRef, { isHost: true });
+      
+      // Emit socket event to notify others
+      socket.emit("hostTransferred", { roomId: currentRoomId, newHostId, previousHostId: userId });
+      
+      toast({
+        title: "Host status transferred",
+        description: `${targetUserSnapshot.val().name} is now the host`
+      });
+    } catch (error) {
+      console.error("Error transferring host status:", error);
+      toast({
+        title: "Error",
+        description: "Failed to transfer host status",
+        variant: "destructive"
+      });
+    }
+  };
+
   return {
     createRoom,
     joinRoom,
-    leaveRoom
+    leaveRoom,
+    transferHostStatus
   };
 };

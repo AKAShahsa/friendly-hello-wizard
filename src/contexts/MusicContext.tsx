@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { onValue, ref, update, get } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
@@ -34,7 +33,8 @@ const defaultContextValue: MusicContextType = {
   setVolume: () => {},
   sendChatMessage: () => {},
   sendReaction: () => {},
-  addSongByUrl: async () => false
+  addSongByUrl: async () => false,
+  transferHostStatus: () => {}
 };
 
 const MusicContext = createContext<MusicContextType>(defaultContextValue);
@@ -68,7 +68,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   } = useCommunication(roomId, userId);
 
   const {
-    createRoom, joinRoom, leaveRoom: leaveRoomFn
+    createRoom, joinRoom, leaveRoom: leaveRoomFn, transferHostStatus
   } = useRoomManagement(
     userId, setRoomId, setUsers, setMessages, 
     setReactions, setQueue, setCurrentTrackState
@@ -325,7 +325,8 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setVolume,
     sendChatMessage,
     sendReaction,
-    addSongByUrl
+    addSongByUrl,
+    transferHostStatus
   };
 
   return (

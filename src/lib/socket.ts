@@ -69,6 +69,10 @@ socket.on("userJoined", (data) => {
   console.log("User joined the room:", data);
 });
 
+socket.on("hostTransferred", (data) => {
+  console.log("Host status transferred:", data);
+});
+
 // Export a function to manually reconnect if needed
 export const reconnectSocket = () => {
   if (!socket.connected && !isConnecting) {

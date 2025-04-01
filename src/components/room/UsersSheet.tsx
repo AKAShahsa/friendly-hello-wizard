@@ -1,10 +1,11 @@
 
-import React, { memo } from "react";
+import React, { memo, useState } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Users, Crown } from "lucide-react";
+import { Users, Crown, ShieldCheck } from "lucide-react";
 import { User } from "@/types/music";
+import { useMusic } from "@/contexts/MusicContext";
 
 interface UsersSheetProps {
   isOpen: boolean;
@@ -14,6 +15,22 @@ interface UsersSheetProps {
 
 // Using memo to prevent unnecessary re-renders
 const UsersSheet: React.FC<UsersSheetProps> = memo(({ isOpen, onOpenChange, users }) => {
+  const { transferHostStatus, users: contextUsers } = useMusic();
+  const [isCurrentUserHost, setIsCurrentUserHost] = useState(false);
+  const userId = localStorage.getItem("userId");
+  
+  // Find current user to check if they're the host
+  React.useEffect(() => {
+    const currentUser = contextUsers.find(u => u.id === userId);
+    setIsCurrentUserHost(!!currentUser?.isHost);
+  }, [contextUsers, userId]);
+
+  const handleTransferHost = (targetUserId: string) => {
+    if (isCurrentUserHost && userId && targetUserId !== userId) {
+      transferHostStatus(targetUserId);
+    }
+  };
+
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent side="right">
@@ -41,7 +58,18 @@ const UsersSheet: React.FC<UsersSheetProps> = memo(({ isOpen, onOpenChange, user
                         </span>
                       )}
                     </div>
-                    <div className={`h-3 w-3 rounded-full ${user.isActive ? 'bg-green-500' : 'bg-gray-400'}`} />
+                    <div className="flex items-center gap-2">
+                      {isCurrentUserHost && user.id !== userId && (
+                        <button 
+                          className="p-1 text-xs bg-primary/20 hover:bg-primary/30 rounded text-primary flex items-center gap-1"
+                          onClick={() => handleTransferHost(user.id)}
+                        >
+                          <ShieldCheck className="h-3 w-3" />
+                          <span>Make Host</span>
+                        </button>
+                      )}
+                      <div className={`h-3 w-3 rounded-full ${user.isActive ? 'bg-green-500' : 'bg-gray-400'}`} />
+                    </div>
                   </div>
                 ))}
               </div>
