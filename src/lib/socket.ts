@@ -15,6 +15,8 @@ export const socket = io("https://music-sync-server.glitch.me", {
 // Keep track of rooms the socket is connected to
 let currentRoomId = null;
 let isConnecting = false;
+let lastSyncTime = Date.now();
+const SYNC_THROTTLE = 1000; // Throttle syncs to once per second
 
 // Configure socket events
 socket.on("connect", () => {
@@ -91,6 +93,11 @@ socket.on("playbackStateChanged", (data) => {
   console.log("Playback state changed:", data);
 });
 
+// Reaction events
+socket.on("reactionEffect", (data) => {
+  console.log("Reaction effect from user:", data);
+});
+
 // Export a function to manually reconnect if needed
 export const reconnectSocket = () => {
   if (!socket.connected && !isConnecting) {
@@ -100,16 +107,34 @@ export const reconnectSocket = () => {
   }
 };
 
-// Send playback state to others
+// Send playback state to others with throttling
 export const syncPlaybackToRoom = (roomId, data) => {
   if (!roomId) return;
-  socket.emit("syncPlayback", { roomId, ...data });
+  
+  // Throttle sync requests to avoid overwhelming the server
+  const now = Date.now();
+  if (now - lastSyncTime > SYNC_THROTTLE) {
+    lastSyncTime = now;
+    socket.emit("syncPlayback", { roomId, ...data });
+  }
 };
 
 // Request sync from host
 export const requestSync = (roomId, userId) => {
   if (!roomId) return;
   socket.emit("syncRequest", { roomId, userId });
+};
+
+// Broadcast reaction effect to all users in room
+export const broadcastReaction = (roomId, reactionType, userId, userName) => {
+  if (!roomId) return;
+  socket.emit("reactionEffect", { 
+    roomId, 
+    reactionType, 
+    userId, 
+    userName,
+    timestamp: Date.now() 
+  });
 };
 
 // Get current room ID

@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ref, push, update, increment, onValue, set } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
@@ -153,6 +154,15 @@ export const useCommunication = (roomId: string | null, userId: string) => {
             ...prev,
             [reactionType]: newValue
           }));
+          
+          // Log the reaction in history for visibility to other users
+          const reactionHistoryRef = ref(rtdb, `rooms/${roomId}/reactionHistory`);
+          push(reactionHistoryRef, {
+            type: reactionType,
+            userId,
+            userName: localStorage.getItem("userName") || "Anonymous",
+            timestamp: Date.now()
+          });
         })
         .catch(error => {
           console.error("Error updating reaction:", error);
@@ -163,7 +173,18 @@ export const useCommunication = (roomId: string | null, userId: string) => {
           });
         });
 
+      // Broadcast to other users via socket
       socket.emit("newReaction", { roomId, reactionType, userId });
+      
+      // Also broadcast effect to show on other users' screens
+      const userName = localStorage.getItem("userName") || "Anonymous";
+      socket.emit("reactionEffect", { 
+        roomId, 
+        reactionType, 
+        userId, 
+        userName,
+        timestamp: Date.now() 
+      });
     } catch (error) {
       console.error("Error sending reaction:", error);
     }

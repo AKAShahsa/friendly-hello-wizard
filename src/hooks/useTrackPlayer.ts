@@ -3,7 +3,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { Howl } from "howler";
 import { Track } from "../types/music";
 import { socket, syncPlaybackToRoom, requestSync } from "@/lib/socket";
-import { ref, update, get } from "firebase/database";
+import { ref, update, get, onValue } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
 import { toast } from "@/hooks/use-toast";
 
@@ -18,6 +18,46 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
   const isUpdatingRef = useRef(false); // Prevent update loops
   const lastSyncTimeRef = useRef(Date.now());
   const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastSyncDataRef = useRef<any>(null);
+  const syncThrottleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Setup database listener for playback state
+  useEffect(() => {
+    if (!roomId) return;
+    
+    const playbackStateRef = ref(rtdb, `rooms/${roomId}/playbackState`);
+    const unsubscribe = onValue(playbackStateRef, (snapshot) => {
+      if (!snapshot.exists() || isHost) return;
+      
+      const playbackData = snapshot.val();
+      console.log("Received playback state from DB:", playbackData);
+      
+      // If we're not the host, sync to the host's playback state
+      if (!isHost && sound && currentTrack) {
+        const serverTimestamp = playbackData.serverTimestamp || Date.now();
+        const elapsedSinceUpdate = (Date.now() - serverTimestamp) / 1000;
+        let syncPosition = playbackData.position + (playbackData.isPlaying ? elapsedSinceUpdate : 0);
+        
+        // Only sync if we're more than 1.5 seconds out of sync
+        const currentPos = sound.seek() as number;
+        if (Math.abs(currentPos - syncPosition) > 1.5) {
+          console.log(`Syncing position from ${currentPos} to ${syncPosition}`);
+          sound.seek(syncPosition);
+        }
+        
+        // Sync play/pause state
+        if (playbackData.isPlaying && !isPlaying) {
+          sound.play();
+          setIsPlaying(true);
+        } else if (!playbackData.isPlaying && isPlaying) {
+          sound.pause();
+          setIsPlaying(false);
+        }
+      }
+    });
+    
+    return () => unsubscribe();
+  }, [roomId, isHost, sound, currentTrack, isPlaying]);
 
   // Add sync request handler
   useEffect(() => {
@@ -28,6 +68,16 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
         const trackPosition = sound.seek();
         const position = typeof trackPosition === 'number' ? trackPosition : 0;
         
+        // Update Firebase with current state
+        const playbackStateRef = ref(rtdb, `rooms/${roomId}/playbackState`);
+        update(playbackStateRef, {
+          trackId: currentTrack?.id,
+          isPlaying: isPlaying,
+          position: position,
+          serverTimestamp: Date.now()
+        });
+        
+        // Also send via socket for immediate sync
         syncPlaybackToRoom(roomId, {
           trackId: currentTrack?.id,
           isPlaying: isPlaying,
@@ -38,21 +88,21 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
     };
     
     const handleSyncPlayback = (data: any) => {
-      if (data.roomId === roomId && !isHost && data.trackId && currentTrack?.id !== data.trackId) {
-        // Need to load a different track
-        const trackRef = ref(rtdb, `rooms/${roomId}/queue/${data.trackId}`);
-        get(trackRef).then((snapshot) => {
-          if (snapshot.exists()) {
-            const track = snapshot.val() as Track;
-            playTrack(track, true, data.position);
-          }
-        });
-      } else if (data.roomId === roomId && !isHost && currentTrack?.id === data.trackId) {
-        // Just need to sync time and playback state
-        if (sound) {
-          // Ensure we're not more than 3 seconds out of sync
+      if (data.roomId === roomId && !isHost) {
+        if (data.trackId && currentTrack?.id !== data.trackId) {
+          // Need to load a different track
+          const trackRef = ref(rtdb, `rooms/${roomId}/queue/${data.trackId}`);
+          get(trackRef).then((snapshot) => {
+            if (snapshot.exists()) {
+              const track = snapshot.val() as Track;
+              playTrack(track, true, data.position);
+            }
+          });
+        } else if (data.trackId && currentTrack?.id === data.trackId && sound) {
+          // Just need to sync time and playback state
+          // Ensure we're not more than 1.5 seconds out of sync
           const currentPos = sound.seek() as number;
-          if (Math.abs(currentPos - data.position) > 3) {
+          if (Math.abs(currentPos - data.position) > 1.5) {
             console.log(`Seeking to ${data.position} (was at ${currentPos})`);
             sound.seek(data.position);
           }
@@ -71,13 +121,16 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
     
     // Handle playback state changes from other users
     const handlePlaybackStateChanged = (data: any) => {
-      if (data.roomId === roomId && !isHost) {
-        if (data.state === "play" && !isPlaying && sound) {
+      if (data.roomId === roomId && !isHost && sound) {
+        if (data.state === "play" && !isPlaying) {
           sound.play();
           setIsPlaying(true);
-        } else if (data.state === "pause" && isPlaying && sound) {
+        } else if (data.state === "pause" && isPlaying) {
           sound.pause();
           setIsPlaying(false);
+        } else if (data.state === "seek" && data.position !== undefined) {
+          sound.seek(data.position);
+          setCurrentTime(data.position);
         }
       }
     };
@@ -112,6 +165,16 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
           const trackPosition = sound.seek();
           const position = typeof trackPosition === 'number' ? trackPosition : 0;
           
+          // Update Firebase with current state
+          const playbackStateRef = ref(rtdb, `rooms/${roomId}/playbackState`);
+          update(playbackStateRef, {
+            trackId: currentTrack.id,
+            isPlaying: isPlaying,
+            position: position,
+            serverTimestamp: Date.now()
+          });
+          
+          // Also send via socket
           syncPlaybackToRoom(roomId, {
             trackId: currentTrack.id,
             isPlaying: isPlaying,
@@ -119,7 +182,7 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
             timestamp: Date.now()
           });
         }
-      }, 5000); // Sync every 5 seconds
+      }, 3000); // Sync every 3 seconds
     }
     
     return () => {
@@ -155,8 +218,20 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
           
           if (roomId && isHost && !isUpdatingRef.current) {
             isUpdatingRef.current = true;
+            
+            // Update Firebase
             const roomRef = ref(rtdb, `rooms/${roomId}`);
-            update(roomRef, { currentTrack: track })
+            const playbackStateRef = ref(rtdb, `rooms/${roomId}/playbackState`);
+            
+            Promise.all([
+              update(roomRef, { currentTrack: track }),
+              update(playbackStateRef, {
+                trackId: track.id,
+                isPlaying: true,
+                position: startPosition,
+                serverTimestamp: Date.now()
+              })
+            ])
               .then(() => {
                 if (!isRemoteChange) {
                   socket.emit("play", { roomId, trackId: track.id });
@@ -175,9 +250,26 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
         onpause: () => {
           setIsPlaying(false);
           
-          if (roomId && isHost && !isRemoteChange) {
-            socket.emit("pause", { roomId });
-            socket.emit("playbackStateChanged", { roomId, state: "pause" });
+          if (roomId && isHost && !isRemoteChange && !isUpdatingRef.current) {
+            isUpdatingRef.current = true;
+            
+            // Update Firebase
+            const playbackStateRef = ref(rtdb, `rooms/${roomId}/playbackState`);
+            update(playbackStateRef, {
+              isPlaying: false,
+              position: newSound.seek() as number,
+              serverTimestamp: Date.now()
+            })
+            .then(() => {
+              socket.emit("pause", { roomId });
+              socket.emit("playbackStateChanged", { roomId, state: "pause" });
+            })
+            .catch(error => {
+              console.error("Error updating playback state on pause:", error);
+            })
+            .finally(() => {
+              isUpdatingRef.current = false;
+            });
           }
         },
         onend: () => {
@@ -230,15 +322,32 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
     sound.seek(time);
     setCurrentTime(time);
     
-    if (roomId && isHost) {
-      socket.emit("seek", { roomId, position: time });
+    if (roomId && isHost && !isUpdatingRef.current) {
+      isUpdatingRef.current = true;
       
-      // Also sync overall playback
-      syncPlaybackToRoom(roomId, {
-        trackId: currentTrack?.id,
-        isPlaying: isPlaying,
+      // Update Firebase
+      const playbackStateRef = ref(rtdb, `rooms/${roomId}/playbackState`);
+      update(playbackStateRef, {
         position: time,
-        timestamp: Date.now()
+        serverTimestamp: Date.now()
+      })
+      .then(() => {
+        socket.emit("seek", { roomId, position: time });
+        socket.emit("playbackStateChanged", { roomId, state: "seek", position: time });
+        
+        // Also sync overall playback
+        syncPlaybackToRoom(roomId, {
+          trackId: currentTrack?.id,
+          isPlaying: isPlaying,
+          position: time,
+          timestamp: Date.now()
+        });
+      })
+      .catch(error => {
+        console.error("Error updating seek time:", error);
+      })
+      .finally(() => {
+        isUpdatingRef.current = false;
       });
     }
   }, [sound, roomId, isHost, currentTrack, isPlaying]);
@@ -306,6 +415,10 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
       if (syncIntervalRef.current) {
         clearInterval(syncIntervalRef.current);
         syncIntervalRef.current = null;
+      }
+      if (syncThrottleTimeoutRef.current) {
+        clearTimeout(syncThrottleTimeoutRef.current);
+        syncThrottleTimeoutRef.current = null;
       }
     };
   }, [sound]);

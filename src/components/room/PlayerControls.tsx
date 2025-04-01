@@ -1,11 +1,13 @@
 
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Play, Pause, SkipBack, SkipForward, Volume2, Volume1, VolumeX } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 
 // Format seconds to MM:SS
 const formatTime = (seconds: number): string => {
+  if (isNaN(seconds)) return "0:00";
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
@@ -34,18 +36,47 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   seek,
   setVolume
 }) => {
+  const isDraggingRef = useRef(false);
+  const progressRef = useRef<HTMLDivElement>(null);
+  const lastSeekTimeRef = useRef(0);
+  
+  // Apply throttling to seek operations to avoid overwhelming the server
+  const throttledSeek = (time: number) => {
+    const now = Date.now();
+    if (now - lastSeekTimeRef.current > 250) { // Throttle to max 4 seeks per second
+      lastSeekTimeRef.current = now;
+      seek(time);
+    }
+  };
+
+  // Calculate progress percentage
+  const progressPercentage = currentTrack?.duration 
+    ? Math.min((currentTime / currentTrack.duration) * 100, 100) 
+    : 0;
+
+  // Handle clicks on the progress bar for seeking
+  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!currentTrack || !progressRef.current) return;
+    
+    const rect = progressRef.current.getBoundingClientRect();
+    const clickPosition = (e.clientX - rect.left) / rect.width;
+    const seekTime = clickPosition * currentTrack.duration;
+    
+    throttledSeek(seekTime);
+  };
+
   return (
     <div className="w-full max-w-md mx-auto">
       {/* Progress Bar */}
-      <div className="mb-2 flex items-center gap-2">
+      <div 
+        className="mb-2 flex items-center gap-2 relative"
+        ref={progressRef}
+        onClick={handleProgressClick}
+      >
         <span className="text-xs">{formatTime(currentTime)}</span>
-        <Slider 
-          value={[currentTime]} 
-          max={currentTrack?.duration || 100}
-          step={1}
-          onValueChange={(value) => seek(value[0])}
-          className="flex-1"
-        />
+        <div className="flex-1 cursor-pointer">
+          <Progress value={progressPercentage} className="h-2" />
+        </div>
         <span className="text-xs">{formatTime(currentTrack?.duration || 0)}</span>
       </div>
 
