@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { onValue, ref, update, get } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
@@ -10,7 +9,6 @@ import { useQueue } from "@/hooks/useQueue";
 import { useCommunication } from "@/hooks/useCommunication";
 import { toast } from "@/hooks/use-toast";
 
-// Create a default context value to prevent "undefined" errors
 const defaultContextValue: MusicContextType = {
   currentTrack: null,
   queue: [],
@@ -54,7 +52,6 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem("userId", userId);
   }, [userId]);
 
-  // Check if current user is host
   useEffect(() => {
     const currentUser = users.find(user => user.id === userId);
     isUserHostRef.current = !!currentUser?.isHost;
@@ -83,7 +80,6 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   );
 
   const nextTrack = () => {
-    // Only host can change tracks
     if (isUserHostRef.current) {
       return queueNextTrack(currentTrack);
     } else {
@@ -97,7 +93,6 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
   
   const prevTrack = () => {
-    // Only host can change tracks
     if (isUserHostRef.current) {
       return queuePrevTrack(currentTrack);
     } else {
@@ -117,7 +112,6 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   
   const leaveRoom = () => leaveRoomFn();
 
-  // Host permission check for player controls
   const handlePlayTrack = (track: Track) => {
     if (isUserHostRef.current) {
       playTrack(track);
@@ -154,14 +148,12 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Sync the local currentTrackState with the player's currentTrack
   useEffect(() => {
     if (currentTrack !== currentTrackState) {
       setCurrentTrackState(currentTrack);
     }
   }, [currentTrack, currentTrackState]);
 
-  // When currentTrackState changes from room management, play the track
   useEffect(() => {
     if (currentTrackState && (!currentTrack || currentTrackState.id !== currentTrack.id)) {
       if (isUserHostRef.current) {
@@ -175,7 +167,6 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return cleanup;
   }, [setupTimeTracking, setCurrentTime]);
 
-  // Clean up previous room listener before setting a new one
   useEffect(() => {
     return () => {
       if (roomListenerRef.current) {
@@ -185,17 +176,9 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, []);
 
-  // Request sync when joining room or when current track changes
-  useEffect(() => {
-    if (roomId && !isUserHostRef.current) {
-      requestSync(roomId, userId);
-    }
-  }, [roomId, isUserHostRef.current, userId, currentTrack]);
-
   useEffect(() => {
     if (!roomId) return;
     
-    // Clean up previous listener if it exists
     if (roomListenerRef.current) {
       roomListenerRef.current();
       roomListenerRef.current = null;
@@ -215,7 +198,6 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const newTrack = roomData.currentTrack as Track;
         if (!currentTrack || currentTrack.id !== newTrack.id) {
           setCurrentTrackState(newTrack);
-          // If host changed, non-hosts should follow
           if (!isUserHostRef.current) {
             playTrack(newTrack, true);
           }
@@ -224,6 +206,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       
       if (roomData.users) {
         const usersList = Object.values(roomData.users) as User[];
+        
         setUsers(usersList);
         
         const currentTime = Date.now();
@@ -281,7 +264,6 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     });
     
-    // Save the unsubscribe function to clean up later
     roomListenerRef.current = unsubscribe;
     
     const keepActive = setInterval(() => {

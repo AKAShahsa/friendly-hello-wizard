@@ -50,7 +50,7 @@ const originalEmit = socket.emit;
 socket.emit = function(event, ...args) {
   if (event === "joinRoom" && args[0] && args[0].roomId) {
     // Prevent emitting duplicate join events
-    if (currentRoomId === args[0].roomId) {
+    if (currentRoomId === args[0].roomId && socket.connected) {
       console.log(`Already in room ${currentRoomId}, not emitting duplicate join`);
       return this;
     }
@@ -66,14 +66,26 @@ socket.emit = function(event, ...args) {
 // Add handler for room events
 socket.on("userLeft", (data) => {
   console.log("User left the room:", data);
+  toast({
+    title: "User left",
+    description: `${data.userName || 'A user'} has left the room`,
+  });
 });
 
 socket.on("userJoined", (data) => {
   console.log("User joined the room:", data);
+  toast({
+    title: "User joined",
+    description: `${data.userName || 'A user'} has joined the room`,
+  });
 });
 
 socket.on("hostTransferred", (data) => {
   console.log("Host status transferred:", data);
+  toast({
+    title: "Host transferred",
+    description: `Host privileges have been transferred to ${data.newHostName || 'another user'}`,
+  });
 });
 
 socket.on("syncRequest", (data) => {
@@ -96,6 +108,12 @@ socket.on("playbackStateChanged", (data) => {
 // Reaction events
 socket.on("reactionEffect", (data) => {
   console.log("Reaction effect from user:", data);
+  if (data.userId && data.userName && data.reactionType) {
+    toast({
+      title: "Reaction",
+      description: `${data.userName} reacted with ${data.reactionType}`,
+    });
+  }
 });
 
 // Export a function to manually reconnect if needed

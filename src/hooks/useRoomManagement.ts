@@ -107,9 +107,11 @@ export const useRoomManagement = (
       
       const roomData = snapshot.val();
       
+      // Check if this user already exists in the room
       const isExistingUser = roomData.users && roomData.users[userId];
       const isHost = isExistingUser && roomData.users[userId].isHost === true;
       
+      // Update or add the user to the room without replacing other users
       const userRef = ref(rtdb, `rooms/${roomId}/users/${userId}`);
       await set(userRef, {
         id: userId,
@@ -127,6 +129,7 @@ export const useRoomManagement = (
       setCurrentRoomId(roomId);
       setRoomId(roomId);
       
+      // Process room data
       if (roomData.queue) {
         setQueue(Object.values(roomData.queue));
       }
@@ -143,9 +146,8 @@ export const useRoomManagement = (
         setReactions(roomData.reactions);
       }
       
-      socket.emit("joinRoom", { roomId, userId });
+      socket.emit("joinRoom", { roomId, userId, userName });
       
-      // Only show toast once per successful join
       toast({
         title: "Room joined",
         description: "You have successfully joined the room"
@@ -214,7 +216,7 @@ export const useRoomManagement = (
     leaveRoomInternal(roomIdToLeave);
   };
 
-  // New function to transfer host status
+  // Function to transfer host status
   const transferHostStatus = async (newHostId: string) => {
     if (!currentRoomId) return;
     
@@ -252,7 +254,12 @@ export const useRoomManagement = (
       await update(targetUserRef, { isHost: true });
       
       // Emit socket event to notify others
-      socket.emit("hostTransferred", { roomId: currentRoomId, newHostId, previousHostId: userId });
+      socket.emit("hostTransferred", { 
+        roomId: currentRoomId, 
+        newHostId, 
+        previousHostId: userId,
+        newHostName: targetUserSnapshot.val().name 
+      });
       
       toast({
         title: "Host status transferred",
