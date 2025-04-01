@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { onValue, ref, update, get } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
@@ -69,7 +68,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     createRoom, joinRoom, leaveRoom: leaveRoomFn
   } = useRoomManagement(
     userId, setRoomId, setUsers, setMessages, 
-    setReactions, setQueue, (track) => track ? playTrack(track) : null
+    setReactions, setQueue, setCurrentTrack
   );
 
   const nextTrack = () => queueNextTrack(currentTrack);
@@ -78,7 +77,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setHowlerVolume(newVolume);
     setVolumeState(newVolume);
   };
-  const leaveRoom = () => leaveRoomFn(roomId);
+  const leaveRoom = () => leaveRoomFn();
 
   useEffect(() => {
     const cleanup = setupTimeTracking(setCurrentTime);
