@@ -1,13 +1,14 @@
+
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { onValue, ref, update, get } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
-import { socket } from "@/lib/socket";
+import { socket, requestSync } from "@/lib/socket";
 import { Track, User, Reaction, MusicContextType, ChatMessage } from "@/types/music";
-import { defaultTracks } from "@/utils/musicDefaults";
 import { useTrackPlayer } from "@/hooks/useTrackPlayer";
 import { useRoomManagement } from "@/hooks/useRoomManagement";
 import { useQueue } from "@/hooks/useQueue";
 import { useCommunication } from "@/hooks/useCommunication";
+import { toast } from "@/hooks/use-toast";
 
 // Create a default context value to prevent "undefined" errors
 const defaultContextValue: MusicContextType = {
@@ -45,6 +46,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [volume, setVolumeState] = useState(0.7);
   const [currentTrackState, setCurrentTrackState] = useState<Track | null>(null);
   const roomListenerRef = useRef<(() => void) | null>(null);
+  const isUserHostRef = useRef<boolean>(false);
 
   const userId = localStorage.getItem("userId") || `user_${Math.random().toString(36).substring(2, 9)}`;
   
@@ -52,15 +54,21 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem("userId", userId);
   }, [userId]);
 
+  // Check if current user is host
+  useEffect(() => {
+    const currentUser = users.find(user => user.id === userId);
+    isUserHostRef.current = !!currentUser?.isHost;
+  }, [users, userId]);
+
   const {
     currentTrack, isPlaying, currentTime, setCurrentTime,
     playTrack, togglePlayPause, seek, setVolume: setHowlerVolume, setupTimeTracking
-  } = useTrackPlayer(roomId, userId, volume);
+  } = useTrackPlayer(roomId, userId, volume, isUserHostRef.current);
 
   const {
     queue, setQueue, addToQueue, removeFromQueue, 
     nextTrack: queueNextTrack, prevTrack: queuePrevTrack, addSongByUrl
-  } = useQueue(roomId, playTrack);
+  } = useQueue(roomId, playTrack, isUserHostRef.current);
 
   const {
     messages, setMessages, reactions, setReactions,
@@ -74,13 +82,77 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setReactions, setQueue, setCurrentTrackState
   );
 
-  const nextTrack = () => queueNextTrack(currentTrack);
-  const prevTrack = () => queuePrevTrack(currentTrack);
+  const nextTrack = () => {
+    // Only host can change tracks
+    if (isUserHostRef.current) {
+      return queueNextTrack(currentTrack);
+    } else {
+      toast({
+        title: "Not allowed",
+        description: "Only the host can control playback",
+        variant: "destructive"
+      });
+      return null;
+    }
+  };
+  
+  const prevTrack = () => {
+    // Only host can change tracks
+    if (isUserHostRef.current) {
+      return queuePrevTrack(currentTrack);
+    } else {
+      toast({
+        title: "Not allowed",
+        description: "Only the host can control playback",
+        variant: "destructive"
+      });
+      return null;
+    }
+  };
+  
   const setVolume = (newVolume: number) => {
     setHowlerVolume(newVolume);
     setVolumeState(newVolume);
   };
+  
   const leaveRoom = () => leaveRoomFn();
+
+  // Host permission check for player controls
+  const handlePlayTrack = (track: Track) => {
+    if (isUserHostRef.current) {
+      playTrack(track);
+    } else {
+      toast({
+        title: "Not allowed",
+        description: "Only the host can control playback",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleTogglePlayPause = () => {
+    if (isUserHostRef.current) {
+      togglePlayPause();
+    } else {
+      toast({
+        title: "Not allowed",
+        description: "Only the host can control playback",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleSeek = (time: number) => {
+    if (isUserHostRef.current) {
+      seek(time);
+    } else {
+      toast({
+        title: "Not allowed",
+        description: "Only the host can control playback",
+        variant: "destructive"
+      });
+    }
+  };
 
   // Sync the local currentTrackState with the player's currentTrack
   useEffect(() => {
@@ -92,7 +164,9 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // When currentTrackState changes from room management, play the track
   useEffect(() => {
     if (currentTrackState && (!currentTrack || currentTrackState.id !== currentTrack.id)) {
-      playTrack(currentTrackState);
+      if (isUserHostRef.current) {
+        playTrack(currentTrackState);
+      }
     }
   }, [currentTrackState, currentTrack, playTrack]);
 
@@ -110,6 +184,13 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     };
   }, []);
+
+  // Request sync when joining room or when current track changes
+  useEffect(() => {
+    if (roomId && !isUserHostRef.current) {
+      requestSync(roomId, userId);
+    }
+  }, [roomId, isUserHostRef.current, userId, currentTrack]);
 
   useEffect(() => {
     if (!roomId) return;
@@ -133,7 +214,11 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (roomData.currentTrack) {
         const newTrack = roomData.currentTrack as Track;
         if (!currentTrack || currentTrack.id !== newTrack.id) {
-          playTrack(newTrack);
+          setCurrentTrackState(newTrack);
+          // If host changed, non-hosts should follow
+          if (!isUserHostRef.current) {
+            playTrack(newTrack, true);
+          }
         }
       }
       
@@ -222,32 +307,32 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!roomId) return;
 
     const handlePlay = (data: any) => {
-      if (data.roomId === roomId && !isPlaying) {
+      if (data.roomId === roomId && !isPlaying && !isUserHostRef.current) {
         togglePlayPause();
       }
     };
     
     const handlePause = (data: any) => {
-      if (data.roomId === roomId && isPlaying) {
+      if (data.roomId === roomId && isPlaying && !isUserHostRef.current) {
         togglePlayPause();
       }
     };
     
     const handleSeek = (data: any) => {
-      if (data.roomId === roomId) {
+      if (data.roomId === roomId && !isUserHostRef.current) {
         seek(data.position);
       }
     };
     
     const handleNextTrack = (data: any) => {
-      if (data.roomId === roomId) {
-        nextTrack();
+      if (data.roomId === roomId && !isUserHostRef.current) {
+        queueNextTrack(currentTrack);
       }
     };
     
     const handlePrevTrack = (data: any) => {
-      if (data.roomId === roomId) {
-        prevTrack();
+      if (data.roomId === roomId && !isUserHostRef.current) {
+        queuePrevTrack(currentTrack);
       }
     };
 
@@ -300,7 +385,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       socket.off("newMessage", handleNewMessage);
       socket.off("newReaction", handleNewReaction);
     };
-  }, [roomId, isPlaying, togglePlayPause, seek, nextTrack, prevTrack, setMessages]);
+  }, [roomId, isPlaying, togglePlayPause, seek, queueNextTrack, queuePrevTrack, setMessages, currentTrack]);
 
   const contextValue: MusicContextType = {
     currentTrack,
@@ -317,11 +402,11 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     leaveRoom,
     addToQueue,
     removeFromQueue,
-    playTrack,
-    togglePlayPause,
+    playTrack: handlePlayTrack,
+    togglePlayPause: handleTogglePlayPause,
     nextTrack,
     prevTrack,
-    seek,
+    seek: handleSeek,
     setVolume,
     sendChatMessage,
     sendReaction,

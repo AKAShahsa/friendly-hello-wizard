@@ -1,5 +1,6 @@
 
 import { io } from "socket.io-client";
+import { toast } from '@/hooks/use-toast';
 
 // Create socket connection with reconnection options
 export const socket = io("https://music-sync-server.glitch.me", {
@@ -73,6 +74,23 @@ socket.on("hostTransferred", (data) => {
   console.log("Host status transferred:", data);
 });
 
+socket.on("syncRequest", (data) => {
+  console.log("Received sync request from host", data);
+});
+
+socket.on("syncPlayback", (data) => {
+  console.log("Received playback sync from host:", data);
+});
+
+// Playback sync events
+socket.on("trackChanged", (data) => {
+  console.log("Track changed by host:", data);
+});
+
+socket.on("playbackStateChanged", (data) => {
+  console.log("Playback state changed:", data);
+});
+
 // Export a function to manually reconnect if needed
 export const reconnectSocket = () => {
   if (!socket.connected && !isConnecting) {
@@ -80,6 +98,18 @@ export const reconnectSocket = () => {
     isConnecting = true;
     socket.connect();
   }
+};
+
+// Send playback state to others
+export const syncPlaybackToRoom = (roomId, data) => {
+  if (!roomId) return;
+  socket.emit("syncPlayback", { roomId, ...data });
+};
+
+// Request sync from host
+export const requestSync = (roomId, userId) => {
+  if (!roomId) return;
+  socket.emit("syncRequest", { roomId, userId });
 };
 
 // Get current room ID

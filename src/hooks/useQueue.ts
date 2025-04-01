@@ -6,7 +6,7 @@ import { toast } from "@/hooks/use-toast";
 import { Track } from "@/types/music";
 import { socket } from "@/lib/socket";
 
-export const useQueue = (roomId: string | null, playTrackFn: (track: Track) => void) => {
+export const useQueue = (roomId: string | null, playTrackFn: (track: Track, isRemoteChange?: boolean) => void, isHost: boolean) => {
   const [queue, setQueue] = useState<Track[]>([]);
   const queueRef = useRef<Track[]>([]);
   
@@ -56,12 +56,22 @@ export const useQueue = (roomId: string | null, playTrackFn: (track: Track) => v
       description: `${track.title} by ${track.artist} added to queue`
     });
     
-    if (queue.length === 0) {
+    if (queue.length === 0 && isHost) {
       playTrackFn(track);
     }
   };
 
   const removeFromQueue = (trackId: string) => {
+    // Only host should be able to remove from queue
+    if (!isHost) {
+      toast({
+        title: "Not allowed",
+        description: "Only the host can remove tracks from the queue",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setQueue(prev => prev.filter(track => track.id !== trackId));
     
     if (roomId) {
@@ -72,6 +82,9 @@ export const useQueue = (roomId: string | null, playTrackFn: (track: Track) => v
 
   const nextTrack = (currentTrack: Track | null) => {
     if (!currentTrack || queue.length === 0) return null;
+    
+    // Only host should be able to change tracks
+    if (!isHost) return null;
     
     const currentIndex = queue.findIndex(track => track.id === currentTrack.id);
     console.log("Current track index:", currentIndex, "Queue length:", queue.length);
@@ -86,6 +99,7 @@ export const useQueue = (roomId: string | null, playTrackFn: (track: Track) => v
         update(roomRef, { currentTrack: nextTrack })
           .then(() => {
             socket.emit("nextTrack", { roomId });
+            socket.emit("trackChanged", { roomId, trackId: nextTrack.id });
           })
           .catch(error => {
             console.error("Error updating next track:", error);
@@ -102,6 +116,9 @@ export const useQueue = (roomId: string | null, playTrackFn: (track: Track) => v
   const prevTrack = (currentTrack: Track | null) => {
     if (!currentTrack || queue.length === 0) return null;
     
+    // Only host should be able to change tracks
+    if (!isHost) return null;
+    
     const currentIndex = queue.findIndex(track => track.id === currentTrack.id);
     console.log("Current track index (prev):", currentIndex);
     
@@ -115,6 +132,7 @@ export const useQueue = (roomId: string | null, playTrackFn: (track: Track) => v
         update(roomRef, { currentTrack: prevTrack })
           .then(() => {
             socket.emit("prevTrack", { roomId });
+            socket.emit("trackChanged", { roomId, trackId: prevTrack.id });
           })
           .catch(error => {
             console.error("Error updating previous track:", error);
