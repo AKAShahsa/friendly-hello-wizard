@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+
+import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { onValue, ref, update, get } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
 import { socket } from "@/lib/socket";
@@ -43,6 +44,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [roomId, setRoomId] = useState<string | null>(null);
   const [volume, setVolumeState] = useState(0.7);
   const [currentTrackState, setCurrentTrackState] = useState<Track | null>(null);
+  const roomListenerRef = useRef<(() => void) | null>(null);
 
   const userId = localStorage.getItem("userId") || `user_${Math.random().toString(36).substring(2, 9)}`;
   
@@ -99,8 +101,24 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return cleanup;
   }, [setupTimeTracking, setCurrentTime]);
 
+  // Clean up previous room listener before setting a new one
+  useEffect(() => {
+    return () => {
+      if (roomListenerRef.current) {
+        roomListenerRef.current();
+        roomListenerRef.current = null;
+      }
+    };
+  }, []);
+
   useEffect(() => {
     if (!roomId) return;
+    
+    // Clean up previous listener if it exists
+    if (roomListenerRef.current) {
+      roomListenerRef.current();
+      roomListenerRef.current = null;
+    }
     
     const roomRef = ref(rtdb, `rooms/${roomId}`);
     const unsubscribe = onValue(roomRef, (snapshot) => {
@@ -178,6 +196,9 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     });
     
+    // Save the unsubscribe function to clean up later
+    roomListenerRef.current = unsubscribe;
+    
     const keepActive = setInterval(() => {
       if (!roomId) return;
       
@@ -189,7 +210,10 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }, 30000);
     
     return () => {
-      unsubscribe();
+      if (roomListenerRef.current) {
+        roomListenerRef.current();
+        roomListenerRef.current = null;
+      }
       clearInterval(keepActive);
     };
   }, [roomId, currentTrack, setQueue, playTrack, setMessages, setReactions, userId]);
@@ -197,37 +221,37 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     if (!roomId) return;
 
-    socket.on("play", (data) => {
+    const handlePlay = (data: any) => {
       if (data.roomId === roomId && !isPlaying) {
         togglePlayPause();
       }
-    });
+    };
     
-    socket.on("pause", (data) => {
+    const handlePause = (data: any) => {
       if (data.roomId === roomId && isPlaying) {
         togglePlayPause();
       }
-    });
+    };
     
-    socket.on("seek", (data) => {
+    const handleSeek = (data: any) => {
       if (data.roomId === roomId) {
         seek(data.position);
       }
-    });
+    };
     
-    socket.on("nextTrack", (data) => {
+    const handleNextTrack = (data: any) => {
       if (data.roomId === roomId) {
         nextTrack();
       }
-    });
+    };
     
-    socket.on("prevTrack", (data) => {
+    const handlePrevTrack = (data: any) => {
       if (data.roomId === roomId) {
         prevTrack();
       }
-    });
+    };
 
-    socket.on("newMessage", (data) => {
+    const handleNewMessage = (data: any) => {
       if (data.roomId === roomId && data.message) {
         try {
           if (
@@ -248,25 +272,33 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           console.error("Error processing new message:", error);
         }
       }
-    });
+    };
 
-    socket.on("newReaction", (data) => {
+    const handleNewReaction = (data: any) => {
       if (data.roomId === roomId) {
         setReactions(prev => ({
           ...prev,
           [data.reactionType]: (prev[data.reactionType] || 0) + 1
         }));
       }
-    });
+    };
+
+    socket.on("play", handlePlay);
+    socket.on("pause", handlePause);
+    socket.on("seek", handleSeek);
+    socket.on("nextTrack", handleNextTrack);
+    socket.on("prevTrack", handlePrevTrack);
+    socket.on("newMessage", handleNewMessage);
+    socket.on("newReaction", handleNewReaction);
 
     return () => {
-      socket.off("play");
-      socket.off("pause");
-      socket.off("seek");
-      socket.off("nextTrack");
-      socket.off("prevTrack");
-      socket.off("newMessage");
-      socket.off("newReaction");
+      socket.off("play", handlePlay);
+      socket.off("pause", handlePause);
+      socket.off("seek", handleSeek);
+      socket.off("nextTrack", handleNextTrack);
+      socket.off("prevTrack", handlePrevTrack);
+      socket.off("newMessage", handleNewMessage);
+      socket.off("newReaction", handleNewReaction);
     };
   }, [roomId, isPlaying, togglePlayPause, seek, nextTrack, prevTrack, setMessages]);
 

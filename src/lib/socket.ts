@@ -1,3 +1,4 @@
+
 import { io } from "socket.io-client";
 
 // Create socket connection with reconnection options
@@ -12,10 +13,12 @@ export const socket = io("https://music-sync-server.glitch.me", {
 
 // Keep track of rooms the socket is connected to
 let currentRoomId = null;
+let isConnecting = false;
 
 // Configure socket events
 socket.on("connect", () => {
   console.log("Socket connected with ID:", socket.id);
+  isConnecting = false;
   
   // Rejoin room if we were in one
   if (currentRoomId) {
@@ -43,6 +46,11 @@ socket.on("error", (error) => {
 const originalEmit = socket.emit;
 socket.emit = function(event, ...args) {
   if (event === "joinRoom" && args[0] && args[0].roomId) {
+    // Prevent emitting duplicate join events
+    if (currentRoomId === args[0].roomId) {
+      console.log(`Already in room ${currentRoomId}, not emitting duplicate join`);
+      return this;
+    }
     currentRoomId = args[0].roomId;
     console.log(`Tracked room join: ${currentRoomId}`);
   } else if (event === "leaveRoom") {
@@ -63,8 +71,17 @@ socket.on("userJoined", (data) => {
 
 // Export a function to manually reconnect if needed
 export const reconnectSocket = () => {
-  if (!socket.connected) {
+  if (!socket.connected && !isConnecting) {
     console.log("Manually reconnecting socket...");
+    isConnecting = true;
     socket.connect();
   }
+};
+
+// Get current room ID
+export const getCurrentRoomId = () => currentRoomId;
+
+// Clear room ID
+export const clearRoomId = () => {
+  currentRoomId = null;
 };

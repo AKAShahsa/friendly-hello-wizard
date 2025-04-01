@@ -28,7 +28,7 @@ const Room = () => {
     currentTrack, queue, isPlaying, currentTime, volume,
     users, togglePlayPause, nextTrack, prevTrack, seek, setVolume,
     leaveRoom, messages, sendChatMessage, reactions, sendReaction, addSongByUrl,
-    joinRoom, playTrack
+    joinRoom, playTrack, roomId: contextRoomId
   } = useMusic();
   
   // State for UI elements
@@ -39,21 +39,25 @@ const Room = () => {
   const [hasJoinedRoom, setHasJoinedRoom] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
-  
-  useEffect(() => {
-    console.log("Room component rendered with roomId:", roomId);
-    console.log("Current users:", users);
-    console.log("Current queue:", queue);
-    console.log("Current track:", currentTrack);
-    console.log("Current reactions:", reactions);
-  }, [roomId, users, queue, currentTrack, reactions]);
+  const [joinAttempted, setJoinAttempted] = useState(false);
   
   // Join room on mount if roomId is available - only once
   useEffect(() => {
     let isMounted = true;
     
-    if (roomId && !hasJoinedRoom) {
+    // If we're already in this room, don't try to join again
+    if (roomId && contextRoomId === roomId) {
+      if (isMounted) {
+        setHasJoinedRoom(true);
+        setIsLoading(false);
+      }
+      return;
+    }
+    
+    // Only attempt to join once per mount cycle
+    if (roomId && !hasJoinedRoom && !joinAttempted) {
       setIsLoading(true);
+      setJoinAttempted(true);
       const userName = localStorage.getItem("userName") || "Guest";
       console.log(`Attempting to join room ${roomId} as ${userName}`);
       
@@ -82,19 +86,19 @@ const Room = () => {
         .finally(() => {
           if (isMounted) setIsLoading(false);
         });
-    } else {
+    } else if (!roomId) {
       setIsLoading(false);
     }
     
     // Handle room leaving on component unmount
     return () => {
       isMounted = false;
-      if (hasJoinedRoom && roomId) {
+      if (hasJoinedRoom && roomId && contextRoomId === roomId) {
         console.log("Leaving room on unmount");
         leaveRoom();
       }
     };
-  }, [roomId, joinRoom, leaveRoom, hasJoinedRoom]);
+  }, [roomId, joinRoom, leaveRoom, hasJoinedRoom, contextRoomId, joinAttempted]);
 
   const handleLeaveRoom = useCallback(() => {
     leaveRoom();

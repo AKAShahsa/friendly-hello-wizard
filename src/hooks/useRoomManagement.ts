@@ -17,9 +17,14 @@ export const useRoomManagement = (
   setCurrentTrack: (track: Track | null) => void
 ) => {
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
+  const [joiningRoom, setJoiningRoom] = useState(false);
 
   const createRoom = async (name: string): Promise<string> => {
     try {
+      if (currentRoomId) {
+        await leaveRoomInternal(currentRoomId, false);
+      }
+      
       const newRoomRef = push(ref(rtdb, 'rooms'));
       const newRoomId = newRoomRef.key as string;
       
@@ -69,7 +74,20 @@ export const useRoomManagement = (
   };
 
   const joinRoom = async (roomId: string, userName: string): Promise<boolean> => {
+    // Prevent duplicate join attempts
+    if (joiningRoom) {
+      console.log("Join already in progress, ignoring duplicate request");
+      return false;
+    }
+    
+    if (currentRoomId === roomId) {
+      console.log("Already in this room, no need to rejoin");
+      return true;
+    }
+    
     try {
+      setJoiningRoom(true);
+      
       if (currentRoomId && currentRoomId !== roomId) {
         await leaveRoomInternal(currentRoomId, false);
       }
@@ -83,6 +101,7 @@ export const useRoomManagement = (
           description: "The room you're trying to join doesn't exist.",
           variant: "destructive"
         });
+        setJoiningRoom(false);
         return false;
       }
       
@@ -126,11 +145,13 @@ export const useRoomManagement = (
       
       socket.emit("joinRoom", { roomId, userId });
       
+      // Only show toast once per successful join
       toast({
         title: "Room joined",
         description: "You have successfully joined the room"
       });
       
+      setJoiningRoom(false);
       return true;
     } catch (error) {
       console.error("Error joining room:", error);
@@ -139,6 +160,7 @@ export const useRoomManagement = (
         description: "Failed to join room",
         variant: "destructive"
       });
+      setJoiningRoom(false);
       return false;
     }
   };

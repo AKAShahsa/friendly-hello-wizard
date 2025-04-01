@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ref, push, update, increment, onValue, set } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
@@ -21,18 +20,30 @@ export const useCommunication = (roomId: string | null, userId: string) => {
     heart: 0,
     smile: 0
   });
+  
+  // Keep track of unsubscribe functions
+  const unsubscribeFunctionsRef = useRef<Array<() => void>>([]);
+
+  // Clean up listeners when component unmounts
+  useEffect(() => {
+    return () => {
+      unsubscribeFunctionsRef.current.forEach(unsubscribe => unsubscribe());
+      unsubscribeFunctionsRef.current = [];
+    };
+  }, []);
 
   // Listen for messages and reactions updates
   useEffect(() => {
     if (!roomId) return;
     
-    let messagesUnsubscribe: () => void = () => {};
-    let reactionsUnsubscribe: () => void = () => {};
+    // Clean up previous listeners
+    unsubscribeFunctionsRef.current.forEach(unsubscribe => unsubscribe());
+    unsubscribeFunctionsRef.current = [];
 
     try {
       // Listen for messages updates
       const dbMessagesRef = ref(rtdb, `rooms/${roomId}/messages`);
-      messagesUnsubscribe = onValue(dbMessagesRef, (snapshot) => {
+      const messagesUnsubscribe = onValue(dbMessagesRef, (snapshot) => {
         if (snapshot.exists()) {
           const messagesData = snapshot.val();
           const messagesList = Object.entries(messagesData).map(([key, value]) => {
@@ -62,10 +73,11 @@ export const useCommunication = (roomId: string | null, userId: string) => {
           }
         }
       });
+      unsubscribeFunctionsRef.current.push(messagesUnsubscribe);
 
       // Listen for reactions updates
       const dbReactionsRef = ref(rtdb, `rooms/${roomId}/reactions`);
-      reactionsUnsubscribe = onValue(dbReactionsRef, (snapshot) => {
+      const reactionsUnsubscribe = onValue(dbReactionsRef, (snapshot) => {
         if (snapshot.exists()) {
           const reactionsData = snapshot.val();
           const newReactions = {
@@ -73,9 +85,6 @@ export const useCommunication = (roomId: string | null, userId: string) => {
             heart: parseInt(reactionsData.heart || 0),
             smile: parseInt(reactionsData.smile || 0)
           };
-          
-          console.log("Firebase reactions data:", reactionsData);
-          console.log("Parsed reactions:", newReactions);
           
           // Only update state if reactions have changed
           if (
@@ -88,13 +97,14 @@ export const useCommunication = (roomId: string | null, userId: string) => {
           }
         }
       });
+      unsubscribeFunctionsRef.current.push(reactionsUnsubscribe);
     } catch (error) {
       console.error("Error setting up communication listeners:", error);
     }
 
     return () => {
-      messagesUnsubscribe();
-      reactionsUnsubscribe();
+      unsubscribeFunctionsRef.current.forEach(unsubscribe => unsubscribe());
+      unsubscribeFunctionsRef.current = [];
     };
   }, [roomId]);
 
@@ -114,6 +124,7 @@ export const useCommunication = (roomId: string | null, userId: string) => {
       const messagesRef = ref(rtdb, `rooms/${roomId}/messages`);
       push(messagesRef, message)
         .catch(error => {
+          console.error("Error pushing message to Firebase:", error);
           toast({
             title: "Error sending message",
             description: "Your message could not be sent. Please try again.",
@@ -131,15 +142,12 @@ export const useCommunication = (roomId: string | null, userId: string) => {
     if (!roomId) return;
 
     try {
-      console.log(`Updating reaction ${reactionType} in room ${roomId}`);
-      
       // Update with direct value instead of increment to fix race conditions
       const reactionRef = ref(rtdb, `rooms/${roomId}/reactions/${reactionType}`);
       const newValue = (reactionsRef.current[reactionType] || 0) + 1;
       
       set(reactionRef, newValue)
         .then(() => {
-          console.log(`Reaction ${reactionType} updated to ${newValue}`);
           // Update local state immediately for better UX
           setReactions(prev => ({
             ...prev,
