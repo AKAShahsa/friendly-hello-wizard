@@ -16,7 +16,7 @@ export const socket = io("https://music-sync-server.glitch.me", {
 let currentRoomId = null;
 let isConnecting = false;
 let lastSyncTime = Date.now();
-const SYNC_THROTTLE = 300; // Throttle syncs to once per 300ms
+const SYNC_THROTTLE = 1000; // Throttle syncs to once per second
 
 // Configure socket events
 socket.on("connect", () => {
@@ -59,9 +59,6 @@ socket.emit = function(event, ...args) {
   } else if (event === "leaveRoom") {
     currentRoomId = null;
     console.log("Tracked room leave");
-  } else if (event === "messageReaction") {
-    // Log message reactions for debugging
-    console.log("Emitting message reaction:", args[0]);
   }
   return originalEmit.apply(this, [event, ...args]);
 };
@@ -108,39 +105,13 @@ socket.on("playbackStateChanged", (data) => {
   console.log("Playback state changed:", data);
 });
 
-// Reaction events with improved handling
+// Reaction events
 socket.on("reactionEffect", (data) => {
-  console.log("Reaction effect received:", data);
+  console.log("Reaction effect from user:", data);
   if (data.userId && data.userName && data.reactionType) {
-    // Only show toast for reactions from other users
-    if (data.userId !== localStorage.getItem("userId")) {
-      toast({
-        title: "Reaction",
-        description: `${data.userName} reacted with ${data.reactionType}`,
-      });
-    }
-  }
-});
-
-// Message reaction events - improved handling
-socket.on("messageReaction", (data) => {
-  console.log("Message reaction received:", data);
-  if (data.userId !== localStorage.getItem("userId")) {
-    // Trigger confetti effect for remote message reactions
-    if (typeof window !== 'undefined' && window.confetti) {
-      const origin = { x: Math.random() * 0.3 + 0.3, y: Math.random() * 0.3 + 0.5 };
-      window.confetti({
-        particleCount: 30,
-        spread: 70,
-        origin,
-        colors: ['#4285F4', '#0F9D58', '#F4B400', '#DB4437']
-      });
-    }
-    
     toast({
-      title: "Message Reaction",
-      description: `${data.userName} reacted to a message with ${data.emoji}`,
-      duration: 3000
+      title: "Reaction",
+      description: `${data.userName} reacted with ${data.reactionType}`,
     });
   }
 });
@@ -178,19 +149,6 @@ export const broadcastReaction = (roomId, reactionType, userId, userName) => {
   socket.emit("reactionEffect", { 
     roomId, 
     reactionType, 
-    userId, 
-    userName,
-    timestamp: Date.now() 
-  });
-};
-
-// Broadcast message reaction to all users in room
-export const broadcastMessageReaction = (roomId, messageTimestamp, emoji, userId, userName) => {
-  if (!roomId) return;
-  socket.emit("messageReaction", { 
-    roomId, 
-    messageTimestamp, 
-    emoji, 
     userId, 
     userName,
     timestamp: Date.now() 

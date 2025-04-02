@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Music, Play } from "lucide-react";
@@ -30,22 +30,14 @@ const QueueSheet: React.FC<QueueSheetProps> = ({
   currentTrack,
   onPlayTrack 
 }) => {
-  const [isTrackSwitching, setIsTrackSwitching] = useState(false);
-  
   useEffect(() => {
     console.log("Queue in QueueSheet:", queue);
     console.log("Current track in QueueSheet:", currentTrack);
   }, [queue, currentTrack]);
 
   const handlePlayTrack = (track: Track) => {
-    if (onPlayTrack && !isTrackSwitching && currentTrack?.id !== track.id) {
-      setIsTrackSwitching(true);
+    if (onPlayTrack) {
       onPlayTrack(track);
-      
-      // Reset switching state after a delay
-      setTimeout(() => {
-        setIsTrackSwitching(false);
-      }, 2000);
     }
   };
 
@@ -73,7 +65,7 @@ const QueueSheet: React.FC<QueueSheetProps> = ({
                       <div className="font-medium truncate">{track.title}</div>
                       <div className="text-sm text-muted-foreground truncate">{track.artist}</div>
                     </div>
-                    {onPlayTrack && currentTrack?.id !== track.id && !isTrackSwitching && (
+                    {onPlayTrack && currentTrack?.id !== track.id && (
                       <Button 
                         variant="ghost" 
                         size="icon" 

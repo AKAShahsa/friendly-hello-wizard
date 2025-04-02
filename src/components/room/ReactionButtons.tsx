@@ -1,7 +1,7 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { ThumbsUp, Heart, Smile, Laugh } from "lucide-react";
+import { ThumbsUp, Heart, Smile } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import confetti from "canvas-confetti";
 import { toast } from "@/hooks/use-toast";
@@ -32,8 +32,12 @@ const ReactionButtons: React.FC<ReactionButtonsProps> = ({ reactions, sendReacti
     lastReactionsRef.current = reactions;
   }, [reactions]);
 
-  // Function to trigger confetti effects
-  const triggerConfettiEffect = (type: "thumbsUp" | "heart" | "smile", fromRemote = false, userId?: string) => {
+  useEffect(() => {
+    // Debug the reactions data
+    console.log("Current reactions state:", reactions);
+  }, [reactions]);
+
+  const triggerConfettiEffect = (type: "thumbsUp" | "heart" | "smile", fromRemote = false) => {
     // Different effects for different reactions
     if (type === "thumbsUp") {
       confetti({
@@ -58,9 +62,9 @@ const ReactionButtons: React.FC<ReactionButtonsProps> = ({ reactions, sendReacti
       });
     }
 
-    // Only show toast for remote reactions from other users
-    if (fromRemote && userId !== localStorage.getItem("userId")) {
-      const reaction = remoteReactions.find(r => r.type === type && r.userId === userId);
+    // Show toast if remote reaction
+    if (fromRemote) {
+      const reaction = remoteReactions.find(r => r.type === type);
       if (reaction) {
         toast({
           title: `${reaction.userName} reacted`,
@@ -75,7 +79,7 @@ const ReactionButtons: React.FC<ReactionButtonsProps> = ({ reactions, sendReacti
     // Listen for remote reactions
     const handleRemoteReaction = (data: any) => {
       console.log("Received remote reaction:", data);
-      if (data.roomId === getCurrentRoomId()) {
+      if (data.roomId === getCurrentRoomId() && data.userId !== localStorage.getItem("userId")) {
         setRemoteReactions(prev => [
           ...prev.filter(r => Date.now() - r.timestamp < 10000), // Keep only recent reactions
           {
@@ -86,8 +90,8 @@ const ReactionButtons: React.FC<ReactionButtonsProps> = ({ reactions, sendReacti
           }
         ]);
 
-        // Trigger the confetti effect for all users (both sender and receivers)
-        triggerConfettiEffect(data.reactionType, true, data.userId);
+        // Trigger the confetti effect
+        triggerConfettiEffect(data.reactionType, true);
       }
     };
 
@@ -101,8 +105,8 @@ const ReactionButtons: React.FC<ReactionButtonsProps> = ({ reactions, sendReacti
   useEffect(() => {
     if (!lastTriggered) return;
 
-    // No need to trigger local confetti here, as it will be handled by the socket event
-    // This prevents double effects for the sender
+    // Trigger confetti for local reaction
+    triggerConfettiEffect(lastTriggered);
 
     // Reset after animation
     const timer = setTimeout(() => {

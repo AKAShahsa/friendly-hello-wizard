@@ -1,3 +1,4 @@
+
 export interface Track {
   id: string;
   title: string;
@@ -22,18 +23,11 @@ export interface Reaction {
   smile: number;
 }
 
-export interface MessageReaction {
-  emoji: string;
-  count: number;
-  userIds: string[];
-}
-
 export interface ChatMessage {
   userId: string;
   userName: string;
   text: string;
   timestamp: number;
-  reactions?: MessageReaction[];
 }
 
 export interface MusicContextType {

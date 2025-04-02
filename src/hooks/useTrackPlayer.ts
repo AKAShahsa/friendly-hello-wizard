@@ -20,7 +20,6 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
   const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSyncDataRef = useRef<any>(null);
   const syncThrottleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isTrackSwitchingRef = useRef(false); // Prevent track switching loops
 
   // Setup database listener for playback state
   useEffect(() => {
@@ -183,7 +182,7 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
             timestamp: Date.now()
           });
         }
-      }, 1000); // Sync every 1 second (reduced from 3 seconds)
+      }, 3000); // Sync every 3 seconds
     }
     
     return () => {
@@ -200,30 +199,16 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
   }, [roomId, userId, isHost, sound, isPlaying, currentTrack]);
 
   const playTrack = useCallback((track: Track, isRemoteChange = false, startPosition = 0) => {
-    if (!track) return;
-    
-    // Prevent track switching loops
-    if (isTrackSwitchingRef.current) {
-      console.log("Track switch already in progress, ignoring duplicate request");
-      return;
-    }
-    
-    // Prevent playing the same track twice
-    if (prevTrackRef.current === track.id) {
-      console.log("Already playing this track, ignoring duplicate play request");
-      return;
-    }
-    
-    isTrackSwitchingRef.current = true;
+    if (!track || prevTrackRef.current === track.id) return;
     prevTrackRef.current = track.id;
     
+    // Stop and unload previous sound
+    if (sound) {
+      sound.stop();
+      sound.unload();
+    }
+    
     try {
-      // Stop and unload previous sound
-      if (sound) {
-        sound.stop();
-        sound.unload();
-      }
-      
       const newSound = new Howl({
         src: [track.audioUrl],
         html5: true,
@@ -298,10 +283,6 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
             description: "Could not load the audio file. Please try another track.",
             variant: "destructive"
           });
-        },
-        onload: () => {
-          // Reset the track switching flag after load completes
-          isTrackSwitchingRef.current = false;
         }
       });
       
@@ -322,7 +303,6 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
         description: "An error occurred while trying to play this track.",
         variant: "destructive"
       });
-      isTrackSwitchingRef.current = false;
     }
   }, [volume, roomId, sound, isHost]);
 

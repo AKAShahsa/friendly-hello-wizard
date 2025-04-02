@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Play, Pause, SkipBack, SkipForward, Volume2, Volume1, VolumeX } from "lucide-react";
@@ -36,8 +36,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   seek,
   setVolume
 }) => {
-  const [isDragging, setIsDragging] = useState(false);
-  const [localProgress, setLocalProgress] = useState(0);
+  const isDraggingRef = useRef(false);
   const progressRef = useRef<HTMLDivElement>(null);
   const lastSeekTimeRef = useRef(0);
   
@@ -47,20 +46,12 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
     if (now - lastSeekTimeRef.current > 250) { // Throttle to max 4 seeks per second
       lastSeekTimeRef.current = now;
       seek(time);
-      setLocalProgress(time);
     }
   };
 
-  // Update local progress when currentTime changes, but only if not dragging
-  useEffect(() => {
-    if (!isDragging) {
-      setLocalProgress(currentTime);
-    }
-  }, [currentTime, isDragging]);
-
   // Calculate progress percentage
   const progressPercentage = currentTrack?.duration 
-    ? Math.min((localProgress / currentTrack.duration) * 100, 100) 
+    ? Math.min((currentTime / currentTrack.duration) * 100, 100) 
     : 0;
 
   // Handle clicks on the progress bar for seeking
@@ -74,38 +65,17 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
     throttledSeek(seekTime);
   };
 
-  // Handle slider change
-  const handleSliderChange = (value: number[]) => {
-    if (!currentTrack) return;
-    
-    const newTime = (value[0] / 100) * currentTrack.duration;
-    setLocalProgress(newTime);
-    setIsDragging(true);
-  };
-
-  // Handle slider commit
-  const handleSliderCommit = (value: number[]) => {
-    if (!currentTrack) return;
-    
-    const newTime = (value[0] / 100) * currentTrack.duration;
-    throttledSeek(newTime);
-    setIsDragging(false);
-  };
-
   return (
     <div className="w-full max-w-md mx-auto">
       {/* Progress Bar */}
-      <div className="mb-2 flex items-center gap-2">
-        <span className="text-xs">{formatTime(localProgress)}</span>
-        <div className="flex-1 relative" ref={progressRef}>
-          <Slider
-            value={[progressPercentage]}
-            max={100}
-            step={0.1}
-            onValueChange={handleSliderChange}
-            onValueCommit={handleSliderCommit}
-            disabled={!currentTrack}
-          />
+      <div 
+        className="mb-2 flex items-center gap-2 relative"
+        ref={progressRef}
+        onClick={handleProgressClick}
+      >
+        <span className="text-xs">{formatTime(currentTime)}</span>
+        <div className="flex-1 cursor-pointer">
+          <Progress value={progressPercentage} className="h-2" />
         </div>
         <span className="text-xs">{formatTime(currentTrack?.duration || 0)}</span>
       </div>

@@ -1,257 +1,97 @@
-import React, { useState, useRef, useEffect } from "react";
+
+import React, { useRef, useEffect, useState, memo } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, Plus } from "lucide-react";
+import { MessageSquare, Send } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ChatMessage } from "@/types/music";
-import EmojiPicker from "./EmojiPicker";
-import MessageReactions from "./MessageReactions";
-import { socket, getCurrentRoomId, broadcastMessageReaction } from "@/lib/socket";
-import { rtdb } from "@/lib/firebase";
-import { ref, push, update, get } from "firebase/database";
-
-interface MessageWithReactions extends ChatMessage {
-  reactions?: Array<{
-    emoji: string;
-    count: number;
-    userIds: string[];
-  }>;
-}
 
 interface ChatSheetProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   messages: ChatMessage[];
-  sendChatMessage: (text: string) => void;
+  sendChatMessage: (message: string) => void;
 }
 
-const ChatSheet: React.FC<ChatSheetProps> = ({ 
-  isOpen, 
-  onOpenChange, 
-  messages, 
-  sendChatMessage 
-}) => {
-  const [text, setText] = useState("");
-  const [messagesWithReactions, setMessagesWithReactions] = useState<MessageWithReactions[]>([]);
-  const endOfMessagesRef = useRef<HTMLDivElement>(null);
-  const roomId = getCurrentRoomId();
-  const userId = localStorage.getItem("userId") || "";
-  
-  const formatTime = (timestamp: number) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-  
+// Using memo to prevent unnecessary re-renders
+const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messages, sendChatMessage }) => {
+  const [message, setMessage] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to bottom of chat when new messages arrive
   useEffect(() => {
-    const processedMessages = messages.map(msg => ({
-      ...msg,
-      reactions: []
-    }));
-    setMessagesWithReactions(processedMessages);
-    
-    if (roomId) {
-      const reactionsRef = ref(rtdb, `rooms/${roomId}/messageReactions`);
-      get(reactionsRef).then(snapshot => {
-        if (snapshot.exists()) {
-          const reactionData = snapshot.val();
-          
-          const updatedMessages = processedMessages.map(msg => {
-            const msgReactions = reactionData[msg.timestamp];
-            if (msgReactions) {
-              return {
-                ...msg,
-                reactions: Object.entries(msgReactions).map(([emoji, data]) => ({
-                  emoji,
-                  count: Object.keys(data).length,
-                  userIds: Object.keys(data)
-                }))
-              };
-            }
-            return msg;
-          });
-          
-          setMessagesWithReactions(updatedMessages);
-        }
-      });
+    if (messagesEndRef.current && isOpen) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages, roomId]);
-  
-  useEffect(() => {
-    if (!roomId) return;
-    
-    const handleMessageReaction = (data: any) => {
-      if (data.roomId === roomId) {
-        const reactionsRef = ref(rtdb, `rooms/${roomId}/messageReactions`);
-        get(reactionsRef).then(snapshot => {
-          if (snapshot.exists()) {
-            const reactionData = snapshot.val();
-            
-            setMessagesWithReactions(prev => prev.map(msg => {
-              if (msg.timestamp === data.messageTimestamp) {
-                const msgReactions = reactionData[msg.timestamp];
-                if (msgReactions) {
-                  return {
-                    ...msg,
-                    reactions: Object.entries(msgReactions).map(([emoji, data]) => ({
-                      emoji,
-                      count: Object.keys(data).length,
-                      userIds: Object.keys(data)
-                    }))
-                  };
-                }
-              }
-              return msg;
-            }));
-          }
-        });
-      }
-    };
-    
-    socket.on("messageReaction", handleMessageReaction);
-    
-    return () => {
-      socket.off("messageReaction", handleMessageReaction);
-    };
-  }, [roomId]);
-  
-  useEffect(() => {
-    if (endOfMessagesRef.current) {
-      endOfMessagesRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messagesWithReactions]);
-  
-  const handleSendMessage = () => {
-    if (text.trim()) {
-      sendChatMessage(text.trim());
-      setText("");
+  }, [messages, isOpen]);
+
+  const handleSendMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (message.trim()) {
+      sendChatMessage(message);
+      setMessage("");
     }
   };
-  
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
-  
-  const handleEmojiSelect = (emoji: string) => {
-    setText(prev => prev + emoji);
-  };
-  
-  const handleAddReaction = (messageTimestamp: number, emoji: string) => {
-    if (!roomId) return;
-    
-    const userName = localStorage.getItem("userName") || "Anonymous";
-    const reactionRef = ref(rtdb, `rooms/${roomId}/messageReactions/${messageTimestamp}/${emoji}/${userId}`);
-    
-    update(reactionRef, { 
-      timestamp: Date.now(),
-      userId
-    }).then(() => {
-      setMessagesWithReactions(prev => 
-        prev.map(msg => {
-          if (msg.timestamp === messageTimestamp) {
-            const existingReaction = msg.reactions?.find(r => r.emoji === emoji);
-            
-            if (existingReaction) {
-              if (!existingReaction.userIds.includes(userId)) {
-                return {
-                  ...msg,
-                  reactions: msg.reactions?.map(r => 
-                    r.emoji === emoji 
-                      ? { ...r, count: r.count + 1, userIds: [...r.userIds, userId] }
-                      : r
-                  )
-                };
-              }
-              return msg;
-            } else {
-              return {
-                ...msg,
-                reactions: [
-                  ...(msg.reactions || []),
-                  { emoji, count: 1, userIds: [userId] }
-                ]
-              };
-            }
-          }
-          return msg;
-        })
-      );
-      
-      broadcastMessageReaction(roomId, messageTimestamp, emoji, userId, userName);
-      
-      console.log(`Broadcasting reaction: ${emoji} for message at ${messageTimestamp}`);
-    });
-  };
-  
+
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent side="left" className="w-[350px] sm:w-[400px]">
+      <SheetContent side="left" className="flex flex-col p-0">
         <div className="h-full flex flex-col">
-          <h2 className="text-xl font-semibold mb-4">Room Chat</h2>
-          
-          <ScrollArea className="flex-1 pr-4">
-            <div className="space-y-6 p-1">
-              {messagesWithReactions.map((message, index) => (
-                <div 
-                  key={`${message.userId}-${message.timestamp}`}
-                  className={`flex flex-col ${message.userId === userId ? 'items-end' : 'items-start'}`}
-                >
-                  <div className="flex flex-col max-w-[85%] group">
-                    <div
-                      className={`rounded-lg px-4 py-2 text-sm shadow-sm ${
-                        message.userId === userId
-                          ? 'bg-primary text-primary-foreground rounded-tr-none'
-                          : 'bg-secondary/80 rounded-tl-none'
-                      }`}
-                    >
-                      <div className="font-semibold text-xs mb-1">
-                        {message.userId === userId ? 'You' : message.userName}
+          <div className="p-4 border-b">
+            <h2 className="text-xl font-semibold">Chat</h2>
+          </div>
+          <ScrollArea className="flex-1 p-4">
+            {messages && messages.length > 0 ? (
+              <div className="space-y-4">
+                {messages.map((msg, index) => (
+                  <div 
+                    key={`${msg.userId}-${msg.timestamp}-${index}`}
+                    className="flex items-start gap-3"
+                  >
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className="text-xs">
+                        {msg.userName.substring(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{msg.userName}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(msg.timestamp).toLocaleTimeString()}
+                        </span>
                       </div>
-                      <div className="whitespace-pre-wrap break-words">{message.text}</div>
-                      <div className="text-xs opacity-70 mt-1 text-right">
-                        {formatTime(message.timestamp)}
-                      </div>
-                    </div>
-                    
-                    <div className={`${message.userId === userId ? 'self-end' : 'self-start'} -mt-1`}>
-                      <MessageReactions 
-                        reactions={message.reactions || []}
-                        onAddReaction={(emoji) => handleAddReaction(message.timestamp, emoji)}
-                        messageId={`${message.userId}-${message.timestamp}`}
-                      />
+                      <p className="mt-1">{msg.text}</p>
                     </div>
                   </div>
-                </div>
-              ))}
-              <div ref={endOfMessagesRef} />
-            </div>
+                ))}
+                <div ref={messagesEndRef} />
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-20" />
+                <p>No messages yet</p>
+              </div>
+            )}
           </ScrollArea>
-          
-          <div className="mt-4 flex gap-2 items-center bg-secondary/30 p-2 rounded-lg">
-            <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+          <form onSubmit={handleSendMessage} className="p-4 border-t flex gap-2">
             <Input
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
               placeholder="Type a message..."
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={handleKeyDown}
-              className="flex-1 bg-background/70"
+              className="flex-1"
             />
-            <Button 
-              size="icon" 
-              onClick={handleSendMessage}
-              disabled={!text.trim()}
-              className="bg-primary/90 hover:bg-primary"
-            >
+            <Button type="submit" size="icon">
               <Send className="h-4 w-4" />
             </Button>
-          </div>
+          </form>
         </div>
       </SheetContent>
     </Sheet>
   );
-};
+});
+
+ChatSheet.displayName = "ChatSheet";
 
 export default ChatSheet;
