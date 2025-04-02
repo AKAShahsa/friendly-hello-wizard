@@ -16,7 +16,7 @@ export const socket = io("https://music-sync-server.glitch.me", {
 let currentRoomId = null;
 let isConnecting = false;
 let lastSyncTime = Date.now();
-const SYNC_THROTTLE = 1000; // Throttle syncs to once per second
+const SYNC_THROTTLE = 300; // Throttle syncs to once per 300ms
 
 // Configure socket events
 socket.on("connect", () => {
@@ -105,13 +105,28 @@ socket.on("playbackStateChanged", (data) => {
   console.log("Playback state changed:", data);
 });
 
-// Reaction events
+// Reaction events with improved handling
 socket.on("reactionEffect", (data) => {
-  console.log("Reaction effect from user:", data);
+  console.log("Reaction effect received:", data);
   if (data.userId && data.userName && data.reactionType) {
+    // Only show toast for reactions from other users
+    if (data.userId !== localStorage.getItem("userId")) {
+      toast({
+        title: "Reaction",
+        description: `${data.userName} reacted with ${data.reactionType}`,
+      });
+    }
+  }
+});
+
+// Message reaction events
+socket.on("messageReaction", (data) => {
+  console.log("Message reaction received:", data);
+  if (data.userId !== localStorage.getItem("userId")) {
     toast({
-      title: "Reaction",
-      description: `${data.userName} reacted with ${data.reactionType}`,
+      title: "Message Reaction",
+      description: `${data.userName} reacted to a message with ${data.emoji}`,
+      duration: 3000
     });
   }
 });
