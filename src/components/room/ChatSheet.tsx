@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -39,13 +38,11 @@ const ChatSheet: React.FC<ChatSheetProps> = ({
   const roomId = getCurrentRoomId();
   const userId = localStorage.getItem("userId") || "";
   
-  // Format timestamp to readable time
   const formatTime = (timestamp: number) => {
     const date = new Date(timestamp);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
   
-  // Process messages and add reactions property
   useEffect(() => {
     const processedMessages = messages.map(msg => ({
       ...msg,
@@ -53,7 +50,6 @@ const ChatSheet: React.FC<ChatSheetProps> = ({
     }));
     setMessagesWithReactions(processedMessages);
     
-    // Load message reactions from database
     if (roomId) {
       const reactionsRef = ref(rtdb, `rooms/${roomId}/messageReactions`);
       get(reactionsRef).then(snapshot => {
@@ -81,14 +77,13 @@ const ChatSheet: React.FC<ChatSheetProps> = ({
     }
   }, [messages, roomId]);
   
-  // Listen for reaction updates in real-time
   useEffect(() => {
     if (!roomId) return;
     
     const reactionsRef = ref(rtdb, `rooms/${roomId}/messageReactions`);
-    const unsubscribe = socket.on("messageReaction", (data) => {
+    
+    const handleMessageReaction = (data: any) => {
       if (data.roomId === roomId) {
-        // Update the UI with the new reaction
         get(reactionsRef).then(snapshot => {
           if (snapshot.exists()) {
             const reactionData = snapshot.val();
@@ -112,14 +107,15 @@ const ChatSheet: React.FC<ChatSheetProps> = ({
           }
         });
       }
-    });
+    };
+    
+    socket.on("messageReaction", handleMessageReaction);
     
     return () => {
-      socket.off("messageReaction", unsubscribe);
+      socket.off("messageReaction", handleMessageReaction);
     };
   }, [roomId]);
   
-  // Scroll to bottom of messages on new message
   useEffect(() => {
     if (endOfMessagesRef.current) {
       endOfMessagesRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -152,14 +148,12 @@ const ChatSheet: React.FC<ChatSheetProps> = ({
       timestamp: Date.now(),
       userId
     }).then(() => {
-      // Update local state for immediate feedback
       setMessagesWithReactions(prev => 
         prev.map(msg => {
           if (msg.timestamp === messageTimestamp) {
             const existingReaction = msg.reactions?.find(r => r.emoji === emoji);
             
             if (existingReaction) {
-              // Update existing reaction if the user hasn't already reacted
               if (!existingReaction.userIds.includes(userId)) {
                 return {
                   ...msg,
@@ -172,7 +166,6 @@ const ChatSheet: React.FC<ChatSheetProps> = ({
               }
               return msg;
             } else {
-              // Add new reaction
               return {
                 ...msg,
                 reactions: [
@@ -186,7 +179,6 @@ const ChatSheet: React.FC<ChatSheetProps> = ({
         })
       );
       
-      // Broadcast to other users
       socket.emit("messageReaction", { 
         roomId, 
         messageTimestamp, 
@@ -227,7 +219,6 @@ const ChatSheet: React.FC<ChatSheetProps> = ({
                       </div>
                     </div>
                     
-                    {/* Message reactions attached directly to the message */}
                     <div className={`${message.userId === userId ? 'self-end' : 'self-start'} -mt-1`}>
                       <MessageReactions 
                         reactions={message.reactions || []}
