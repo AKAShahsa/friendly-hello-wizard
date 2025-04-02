@@ -59,6 +59,9 @@ socket.emit = function(event, ...args) {
   } else if (event === "leaveRoom") {
     currentRoomId = null;
     console.log("Tracked room leave");
+  } else if (event === "messageReaction") {
+    // Log message reactions for debugging
+    console.log("Emitting message reaction:", args[0]);
   }
   return originalEmit.apply(this, [event, ...args]);
 };
@@ -119,7 +122,7 @@ socket.on("reactionEffect", (data) => {
   }
 });
 
-// Message reaction events
+// Message reaction events - improved handling
 socket.on("messageReaction", (data) => {
   console.log("Message reaction received:", data);
   if (data.userId !== localStorage.getItem("userId")) {
@@ -164,6 +167,19 @@ export const broadcastReaction = (roomId, reactionType, userId, userName) => {
   socket.emit("reactionEffect", { 
     roomId, 
     reactionType, 
+    userId, 
+    userName,
+    timestamp: Date.now() 
+  });
+};
+
+// Broadcast message reaction to all users in room
+export const broadcastMessageReaction = (roomId, messageTimestamp, emoji, userId, userName) => {
+  if (!roomId) return;
+  socket.emit("messageReaction", { 
+    roomId, 
+    messageTimestamp, 
+    emoji, 
     userId, 
     userName,
     timestamp: Date.now() 

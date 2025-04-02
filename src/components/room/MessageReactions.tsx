@@ -34,7 +34,8 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
   const currentUserId = localStorage.getItem("userId") || "";
   
   const handleReactionClick = (reaction: MessageReaction) => {
-    // Always trigger reaction click even if user already reacted
+    // This is a key part - always trigger the reaction, regardless of previous state
+    // This allows re-triggering reactions and ensures broadcasting happens
     onAddReaction(reaction.emoji);
   };
   
@@ -51,7 +52,7 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
           size="sm"
           className={`h-6 px-1.5 py-0 text-xs rounded-full shadow-sm cursor-pointer hover:scale-110 transition-all ${
             userHasReacted(reaction.userIds) ? 'bg-secondary/90' : 'bg-secondary/50'
-          } hover:bg-secondary/80`}
+          } hover:bg-secondary/80 active:scale-95`}
           onClick={() => handleReactionClick(reaction)}
         >
           <span className="mr-1">{reaction.emoji}</span>
@@ -64,7 +65,7 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
           <Button 
             variant="ghost" 
             size="sm" 
-            className="h-6 w-6 p-0 rounded-full bg-secondary/30 hover:bg-secondary/60 cursor-pointer hover:scale-110"
+            className="h-6 w-6 p-0 rounded-full bg-secondary/30 hover:bg-secondary/60 cursor-pointer hover:scale-110 active:scale-95"
           >
             <Plus className="h-3.5 w-3.5" />
           </Button>
@@ -76,7 +77,7 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
                 key={emoji}
                 variant="ghost"
                 size="sm"
-                className="h-8 w-8 p-0 rounded-full hover:bg-secondary/60 cursor-pointer hover:scale-110"
+                className="h-8 w-8 p-0 rounded-full hover:bg-secondary/60 cursor-pointer hover:scale-110 active:scale-95"
                 onClick={() => {
                   onAddReaction(emoji);
                   setShowReactionPicker(false);

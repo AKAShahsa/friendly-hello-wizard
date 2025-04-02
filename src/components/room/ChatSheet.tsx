@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -80,10 +81,9 @@ const ChatSheet: React.FC<ChatSheetProps> = ({
   useEffect(() => {
     if (!roomId) return;
     
-    const reactionsRef = ref(rtdb, `rooms/${roomId}/messageReactions`);
-    
     const handleMessageReaction = (data: any) => {
       if (data.roomId === roomId) {
+        const reactionsRef = ref(rtdb, `rooms/${roomId}/messageReactions`);
         get(reactionsRef).then(snapshot => {
           if (snapshot.exists()) {
             const reactionData = snapshot.val();
@@ -143,7 +143,9 @@ const ChatSheet: React.FC<ChatSheetProps> = ({
   const handleAddReaction = (messageTimestamp: number, emoji: string) => {
     if (!roomId) return;
     
+    const userName = localStorage.getItem("userName") || "Anonymous";
     const reactionRef = ref(rtdb, `rooms/${roomId}/messageReactions/${messageTimestamp}/${emoji}/${userId}`);
+    
     update(reactionRef, { 
       timestamp: Date.now(),
       userId
@@ -179,13 +181,16 @@ const ChatSheet: React.FC<ChatSheetProps> = ({
         })
       );
       
+      // Ensure we include all necessary information for the socket broadcast
       socket.emit("messageReaction", { 
         roomId, 
         messageTimestamp, 
         emoji, 
         userId, 
-        userName: localStorage.getItem("userName") || "Anonymous" 
+        userName // Include the userName for toast notifications
       });
+      
+      console.log(`Broadcasting reaction: ${emoji} for message at ${messageTimestamp}`);
     });
   };
   
