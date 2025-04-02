@@ -161,26 +161,26 @@ const ChatSheet: React.FC<ChatSheetProps> = ({
   
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent side="right">
+      <SheetContent side="left" className="w-[350px] sm:w-[400px]">
         <div className="h-full flex flex-col">
           <h2 className="text-xl font-semibold mb-4">Room Chat</h2>
           
           <ScrollArea className="flex-1 pr-4">
-            <div className="space-y-4">
+            <div className="space-y-4 p-1">
               {messagesWithReactions.map((message, index) => (
                 <div 
                   key={`${message.userId}-${message.timestamp}`}
                   className={`flex flex-col ${message.userId === userId ? 'items-end' : 'items-start'}`}
                 >
-                  <div className="flex items-end gap-2">
+                  <div className="flex items-end gap-2 max-w-[85%] group">
                     <div
-                      className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
+                      className={`rounded-2xl px-4 py-2 text-sm shadow-sm ${
                         message.userId === userId
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-secondary'
+                          ? 'bg-primary text-primary-foreground rounded-tr-none'
+                          : 'bg-secondary rounded-tl-none'
                       }`}
                     >
-                      <div className="font-medium text-xs mb-1">
+                      <div className="font-semibold text-xs mb-1">
                         {message.userId === userId ? 'You' : message.userName}
                       </div>
                       <div className="whitespace-pre-wrap break-words">{message.text}</div>
@@ -191,30 +191,33 @@ const ChatSheet: React.FC<ChatSheetProps> = ({
                   </div>
                   
                   {/* Message reactions */}
-                  <MessageReactions 
-                    reactions={message.reactions || []}
-                    onAddReaction={(emoji) => handleAddReaction(message.timestamp, emoji)}
-                    messageId={`${message.userId}-${message.timestamp}`}
-                  />
+                  <div className="ml-1 mt-1">
+                    <MessageReactions 
+                      reactions={message.reactions || []}
+                      onAddReaction={(emoji) => handleAddReaction(message.timestamp, emoji)}
+                      messageId={`${message.userId}-${message.timestamp}`}
+                    />
+                  </div>
                 </div>
               ))}
               <div ref={endOfMessagesRef} />
             </div>
           </ScrollArea>
           
-          <div className="mt-4 flex gap-2 items-center">
+          <div className="mt-4 flex gap-2 items-center bg-secondary/30 p-2 rounded-lg">
             <EmojiPicker onEmojiSelect={handleEmojiSelect} />
             <Input
               placeholder="Type a message..."
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="flex-1"
+              className="flex-1 bg-background/70"
             />
             <Button 
               size="icon" 
               onClick={handleSendMessage}
               disabled={!text.trim()}
+              className="bg-primary/90 hover:bg-primary"
             >
               <Send className="h-4 w-4" />
             </Button>
