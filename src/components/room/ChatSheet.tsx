@@ -81,6 +81,44 @@ const ChatSheet: React.FC<ChatSheetProps> = ({
     }
   }, [messages, roomId]);
   
+  // Listen for reaction updates in real-time
+  useEffect(() => {
+    if (!roomId) return;
+    
+    const reactionsRef = ref(rtdb, `rooms/${roomId}/messageReactions`);
+    const unsubscribe = socket.on("messageReaction", (data) => {
+      if (data.roomId === roomId) {
+        // Update the UI with the new reaction
+        get(reactionsRef).then(snapshot => {
+          if (snapshot.exists()) {
+            const reactionData = snapshot.val();
+            
+            setMessagesWithReactions(prev => prev.map(msg => {
+              if (msg.timestamp === data.messageTimestamp) {
+                const msgReactions = reactionData[msg.timestamp];
+                if (msgReactions) {
+                  return {
+                    ...msg,
+                    reactions: Object.entries(msgReactions).map(([emoji, data]) => ({
+                      emoji,
+                      count: Object.keys(data).length,
+                      userIds: Object.keys(data)
+                    }))
+                  };
+                }
+              }
+              return msg;
+            }));
+          }
+        });
+      }
+    });
+    
+    return () => {
+      socket.off("messageReaction", unsubscribe);
+    };
+  }, [roomId]);
+  
   // Scroll to bottom of messages on new message
   useEffect(() => {
     if (endOfMessagesRef.current) {
@@ -166,18 +204,18 @@ const ChatSheet: React.FC<ChatSheetProps> = ({
           <h2 className="text-xl font-semibold mb-4">Room Chat</h2>
           
           <ScrollArea className="flex-1 pr-4">
-            <div className="space-y-4 p-1">
+            <div className="space-y-6 p-1">
               {messagesWithReactions.map((message, index) => (
                 <div 
                   key={`${message.userId}-${message.timestamp}`}
                   className={`flex flex-col ${message.userId === userId ? 'items-end' : 'items-start'}`}
                 >
-                  <div className="flex items-end gap-2 max-w-[85%] group">
+                  <div className="flex flex-col max-w-[85%] group">
                     <div
-                      className={`rounded-2xl px-4 py-2 text-sm shadow-sm ${
+                      className={`rounded-lg px-4 py-2 text-sm shadow-sm ${
                         message.userId === userId
                           ? 'bg-primary text-primary-foreground rounded-tr-none'
-                          : 'bg-secondary rounded-tl-none'
+                          : 'bg-secondary/80 rounded-tl-none'
                       }`}
                     >
                       <div className="font-semibold text-xs mb-1">
@@ -188,15 +226,15 @@ const ChatSheet: React.FC<ChatSheetProps> = ({
                         {formatTime(message.timestamp)}
                       </div>
                     </div>
-                  </div>
-                  
-                  {/* Message reactions */}
-                  <div className="ml-1 mt-1">
-                    <MessageReactions 
-                      reactions={message.reactions || []}
-                      onAddReaction={(emoji) => handleAddReaction(message.timestamp, emoji)}
-                      messageId={`${message.userId}-${message.timestamp}`}
-                    />
+                    
+                    {/* Message reactions attached directly to the message */}
+                    <div className={`${message.userId === userId ? 'self-end' : 'self-start'} -mt-1`}>
+                      <MessageReactions 
+                        reactions={message.reactions || []}
+                        onAddReaction={(emoji) => handleAddReaction(message.timestamp, emoji)}
+                        messageId={`${message.userId}-${message.timestamp}`}
+                      />
+                    </div>
                   </div>
                 </div>
               ))}

@@ -34,9 +34,7 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
   const currentUserId = localStorage.getItem("userId") || "";
   
   const handleReactionClick = (reaction: MessageReaction) => {
-    // If user already reacted with this emoji, don't add it again
-    if (reaction.userIds.includes(currentUserId)) return;
-    
+    // Always trigger reaction click even if user already reacted
     onAddReaction(reaction.emoji);
   };
   
@@ -45,15 +43,15 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
   };
   
   return (
-    <div className="flex flex-wrap items-center gap-1">
+    <div className="flex flex-wrap items-center gap-1 mt-1">
       {reactions.map((reaction, index) => (
         <Button
           key={`${messageId}-${reaction.emoji}-${index}`}
           variant="ghost"
           size="sm"
-          className={`h-6 px-1.5 py-0 text-xs rounded-full shadow-sm ${
+          className={`h-6 px-1.5 py-0 text-xs rounded-full shadow-sm cursor-pointer hover:scale-110 transition-all ${
             userHasReacted(reaction.userIds) ? 'bg-secondary/90' : 'bg-secondary/50'
-          } hover:bg-secondary/80 transition-all`}
+          } hover:bg-secondary/80`}
           onClick={() => handleReactionClick(reaction)}
         >
           <span className="mr-1">{reaction.emoji}</span>
@@ -66,7 +64,7 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
           <Button 
             variant="ghost" 
             size="sm" 
-            className="h-6 w-6 p-0 rounded-full bg-secondary/30 hover:bg-secondary/60"
+            className="h-6 w-6 p-0 rounded-full bg-secondary/30 hover:bg-secondary/60 cursor-pointer hover:scale-110"
           >
             <Plus className="h-3.5 w-3.5" />
           </Button>
@@ -78,7 +76,7 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
                 key={emoji}
                 variant="ghost"
                 size="sm"
-                className="h-8 w-8 p-0 rounded-full hover:bg-secondary/60"
+                className="h-8 w-8 p-0 rounded-full hover:bg-secondary/60 cursor-pointer hover:scale-110"
                 onClick={() => {
                   onAddReaction(emoji);
                   setShowReactionPicker(false);
