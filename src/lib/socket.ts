@@ -126,6 +126,17 @@ socket.on("reactionEffect", (data) => {
 socket.on("messageReaction", (data) => {
   console.log("Message reaction received:", data);
   if (data.userId !== localStorage.getItem("userId")) {
+    // Trigger confetti effect for remote message reactions
+    if (typeof window !== 'undefined' && window.confetti) {
+      const origin = { x: Math.random() * 0.3 + 0.3, y: Math.random() * 0.3 + 0.5 };
+      window.confetti({
+        particleCount: 30,
+        spread: 70,
+        origin,
+        colors: ['#4285F4', '#0F9D58', '#F4B400', '#DB4437']
+      });
+    }
+    
     toast({
       title: "Message Reaction",
       description: `${data.userName} reacted to a message with ${data.emoji}`,

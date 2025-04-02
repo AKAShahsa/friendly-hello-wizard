@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -8,7 +7,7 @@ import { Send, Plus } from "lucide-react";
 import { ChatMessage } from "@/types/music";
 import EmojiPicker from "./EmojiPicker";
 import MessageReactions from "./MessageReactions";
-import { socket, getCurrentRoomId } from "@/lib/socket";
+import { socket, getCurrentRoomId, broadcastMessageReaction } from "@/lib/socket";
 import { rtdb } from "@/lib/firebase";
 import { ref, push, update, get } from "firebase/database";
 
@@ -181,14 +180,7 @@ const ChatSheet: React.FC<ChatSheetProps> = ({
         })
       );
       
-      // Ensure we include all necessary information for the socket broadcast
-      socket.emit("messageReaction", { 
-        roomId, 
-        messageTimestamp, 
-        emoji, 
-        userId, 
-        userName // Include the userName for toast notifications
-      });
+      broadcastMessageReaction(roomId, messageTimestamp, emoji, userId, userName);
       
       console.log(`Broadcasting reaction: ${emoji} for message at ${messageTimestamp}`);
     });
