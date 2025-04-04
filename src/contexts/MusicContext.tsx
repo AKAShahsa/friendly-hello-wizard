@@ -245,7 +245,8 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               userId: msg.userId,
               userName: msg.userName,
               text: msg.text,
-              timestamp: msg.timestamp
+              timestamp: msg.timestamp,
+              isAI: msg.isAI || msg.userId === 'ai-assistant'
             })) as ChatMessage[];
           
           setMessages(messagesList);
@@ -331,7 +332,8 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               userId: data.message.userId,
               userName: data.message.userName,
               text: data.message.text,
-              timestamp: data.message.timestamp
+              timestamp: data.message.timestamp,
+              isAI: data.message.isAI || data.message.userId === 'ai-assistant'
             };
             setMessages(prev => [...prev, newMessage]);
           }

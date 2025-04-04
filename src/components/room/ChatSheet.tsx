@@ -80,16 +80,16 @@ const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messag
                 {messages.map((msg, index) => (
                   <div 
                     key={`${msg.userId}-${msg.timestamp}-${index}`}
-                    className={`flex items-start gap-3 ${msg.userId === 'ai-assistant' ? 'bg-secondary/30 p-3 rounded-lg' : ''}`}
+                    className={`flex items-start gap-3 ${msg.isAI || msg.userId === 'ai-assistant' ? 'bg-secondary/30 p-3 rounded-lg' : ''}`}
                   >
-                    <Avatar className={`h-8 w-8 ${msg.userId === 'ai-assistant' ? 'bg-primary/20' : ''}`}>
+                    <Avatar className={`h-8 w-8 ${msg.isAI || msg.userId === 'ai-assistant' ? 'bg-primary/20' : ''}`}>
                       <AvatarFallback className="text-xs">
-                        {msg.userId === 'ai-assistant' ? 'AI' : msg.userName.substring(0, 2).toUpperCase()}
+                        {msg.isAI || msg.userId === 'ai-assistant' ? 'AI' : msg.userName.substring(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <span className={`font-medium ${msg.userId === 'ai-assistant' ? 'text-primary' : ''}`}>
+                        <span className={`font-medium ${msg.isAI || msg.userId === 'ai-assistant' ? 'text-primary' : ''}`}>
                           {msg.userName}
                         </span>
                         <span className="text-xs text-muted-foreground">

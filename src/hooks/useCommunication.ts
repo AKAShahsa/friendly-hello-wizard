@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ref, push, update, onValue, set, get } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
@@ -14,7 +13,6 @@ export const useCommunication = (roomId: string | null, userId: string) => {
     smile: 0
   });
   
-  // Use refs to prevent unnecessary re-renders
   const messagesRef = useRef<ChatMessage[]>([]);
   const reactionsRef = useRef<Reaction>({
     thumbsUp: 0,
@@ -22,10 +20,8 @@ export const useCommunication = (roomId: string | null, userId: string) => {
     smile: 0
   });
   
-  // Keep track of unsubscribe functions
   const unsubscribeFunctionsRef = useRef<Array<() => void>>([]);
 
-  // Clean up listeners when component unmounts
   useEffect(() => {
     return () => {
       unsubscribeFunctionsRef.current.forEach(unsubscribe => unsubscribe());
@@ -33,22 +29,18 @@ export const useCommunication = (roomId: string | null, userId: string) => {
     };
   }, []);
 
-  // Listen for messages and reactions updates
   useEffect(() => {
     if (!roomId) return;
     
-    // Clean up previous listeners
     unsubscribeFunctionsRef.current.forEach(unsubscribe => unsubscribe());
     unsubscribeFunctionsRef.current = [];
 
     try {
-      // Listen for messages updates
       const dbMessagesRef = ref(rtdb, `rooms/${roomId}/messages`);
       const messagesUnsubscribe = onValue(dbMessagesRef, (snapshot) => {
         if (snapshot.exists()) {
           const messagesData = snapshot.val();
           const messagesList = Object.entries(messagesData).map(([key, value]) => {
-            // Ensure value is properly typed as ChatMessage
             const msg = value as any;
             if (
               msg && 
@@ -61,13 +53,13 @@ export const useCommunication = (roomId: string | null, userId: string) => {
                 userId: msg.userId,
                 userName: msg.userName,
                 text: msg.text,
-                timestamp: msg.timestamp
+                timestamp: msg.timestamp,
+                isAI: msg.isAI || msg.userId === 'ai-assistant'
               } as ChatMessage;
             }
             return null;
           }).filter(Boolean) as ChatMessage[];
           
-          // Only update state if messages have changed
           if (JSON.stringify(messagesList) !== JSON.stringify(messagesRef.current)) {
             messagesRef.current = messagesList;
             setMessages(messagesList);
@@ -76,7 +68,6 @@ export const useCommunication = (roomId: string | null, userId: string) => {
       });
       unsubscribeFunctionsRef.current.push(messagesUnsubscribe);
 
-      // Listen for reactions updates
       const dbReactionsRef = ref(rtdb, `rooms/${roomId}/reactions`);
       const reactionsUnsubscribe = onValue(dbReactionsRef, (snapshot) => {
         if (snapshot.exists()) {
@@ -87,7 +78,6 @@ export const useCommunication = (roomId: string | null, userId: string) => {
             smile: parseInt(reactionsData.smile || 0)
           };
           
-          // Only update state if reactions have changed
           if (
             newReactions.thumbsUp !== reactionsRef.current.thumbsUp ||
             newReactions.heart !== reactionsRef.current.heart ||
@@ -112,18 +102,14 @@ export const useCommunication = (roomId: string | null, userId: string) => {
   const sendChatMessage = useCallback(async (text: string) => {
     if (!roomId || !text.trim()) return;
     
-    // Check if this is an AI request (@AI)
     if (text.trim().startsWith('@AI')) {
-      // Process AI request 
       const aiPrompt = text.trim().substring(3).trim();
       
       try {
         const response = await fetchGeminiResponse(aiPrompt);
         
-        // Add both user message and AI response
         const userName = localStorage.getItem("userName") || "Anonymous";
         
-        // First add user message
         const userMessage: ChatMessage = {
           userId,
           userName,
@@ -134,17 +120,16 @@ export const useCommunication = (roomId: string | null, userId: string) => {
         const messagesRef = ref(rtdb, `rooms/${roomId}/messages`);
         await push(messagesRef, userMessage);
         
-        // Then add AI response
         const aiMessage: ChatMessage = {
           userId: 'ai-assistant',
           userName: 'AI Assistant',
           text: response,
-          timestamp: Date.now() + 100 // Add 100ms to ensure it appears after user message
+          timestamp: Date.now() + 100,
+          isAI: true
         };
         
         await push(messagesRef, aiMessage);
         
-        // Broadcast notification that AI responded
         socket.emit("newMessage", { roomId, message: aiMessage });
         
       } catch (error) {
@@ -155,7 +140,6 @@ export const useCommunication = (roomId: string | null, userId: string) => {
           variant: "destructive"
         });
         
-        // Still send the original message
         const userName = localStorage.getItem("userName") || "Anonymous";
         const message: ChatMessage = {
           userId,
@@ -170,7 +154,6 @@ export const useCommunication = (roomId: string | null, userId: string) => {
         socket.emit("newMessage", { roomId, message });
       }
     } else {
-      // Regular message
       const userName = localStorage.getItem("userName") || "Anonymous";
       
       const message: ChatMessage = {
@@ -203,7 +186,6 @@ export const useCommunication = (roomId: string | null, userId: string) => {
     if (!roomId) return;
 
     try {
-      // Check current reaction count first to avoid race conditions
       const reactionRef = ref(rtdb, `rooms/${roomId}/reactions/${reactionType}`);
       const snapshot = await get(reactionRef);
       const currentCount = snapshot.exists() ? snapshot.val() : 0;
@@ -211,13 +193,11 @@ export const useCommunication = (roomId: string | null, userId: string) => {
       
       await set(reactionRef, newValue)
         .then(() => {
-          // Update local state immediately for better UX
           setReactions(prev => ({
             ...prev,
             [reactionType]: newValue
           }));
           
-          // Log the reaction in history for visibility to other users
           const reactionHistoryRef = ref(rtdb, `rooms/${roomId}/reactionHistory`);
           push(reactionHistoryRef, {
             type: reactionType,
@@ -235,14 +215,12 @@ export const useCommunication = (roomId: string | null, userId: string) => {
           });
         });
 
-      // Broadcast to other users via socket
       socket.emit("newReaction", { 
         roomId, 
         reactionType, 
         userId 
       });
       
-      // Also broadcast effect to show on other users' screens
       const userName = localStorage.getItem("userName") || "Anonymous";
       broadcastReaction(roomId, reactionType, userId, userName);
     } catch (error) {
@@ -250,7 +228,6 @@ export const useCommunication = (roomId: string | null, userId: string) => {
     }
   }, [roomId, userId]);
 
-  // Function to fetch response from Gemini AI
   const fetchGeminiResponse = async (prompt: string): Promise<string> => {
     try {
       const API_KEY = "AIzaSyCsvBo5fhK0k5kTeKJ_Wmorfuefw8g-6AA";
@@ -285,7 +262,6 @@ export const useCommunication = (roomId: string | null, userId: string) => {
       
       const data = await response.json();
       
-      // Extract text from the response
       if (data.candidates && 
           data.candidates[0] && 
           data.candidates[0].content && 
