@@ -22,6 +22,7 @@ const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messag
   const [message, setMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showAIPopover, setShowAIPopover] = useState(false);
+  const [messageReactions, setMessageReactions] = useState<{[messageIndex: number]: {[type: string]: boolean}}>({}); 
   
   // Scroll to bottom of chat when new messages arrive
   useEffect(() => {
@@ -50,6 +51,15 @@ const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messag
   };
   
   const handleMessageReaction = (messageIndex: number, reactionType: string) => {
+    // Update local state for immediate visual feedback
+    setMessageReactions(prev => ({
+      ...prev,
+      [messageIndex]: {
+        ...(prev[messageIndex] || {}),
+        [reactionType]: true
+      }
+    }));
+    
     // Provide visual feedback of the reaction
     toast({
       title: "Reaction sent",
@@ -61,8 +71,24 @@ const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messag
     const buttonElement = document.querySelector(`#message-reaction-${messageIndex}-${reactionType}`);
     if (buttonElement) {
       buttonElement.classList.add('text-primary');
+      buttonElement.classList.add('animate-pulse');
+      
+      // Add confetti effect
+      const rect = buttonElement.getBoundingClientRect();
+      const x = (rect.left + rect.right) / 2 / window.innerWidth;
+      const y = (rect.top + rect.bottom) / 2 / window.innerHeight;
+      
+      window.confetti({
+        particleCount: 30,
+        spread: 70,
+        origin: { x, y },
+        colors: reactionType === 'heart' ? ['#ff0000', '#ff69b4'] : 
+                reactionType === 'smile' ? ['#ffd700', '#ffa500'] : 
+                ['#4285F4', '#0F9D58']
+      });
+      
       setTimeout(() => {
-        buttonElement.classList.remove('text-primary');
+        buttonElement.classList.remove('animate-pulse');
       }, 1000);
     }
   };
@@ -103,21 +129,21 @@ const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messag
                         <button 
                           id={`message-reaction-${index}-thumbsUp`}
                           onClick={() => handleMessageReaction(index, 'thumbsUp')}
-                          className="text-muted-foreground hover:text-primary transition-colors"
+                          className={`transition-colors ${messageReactions[index]?.thumbsUp ? 'text-primary' : 'text-muted-foreground hover:text-primary'}`}
                         >
                           <ThumbsUp className="h-3.5 w-3.5" />
                         </button>
                         <button 
                           id={`message-reaction-${index}-heart`}
                           onClick={() => handleMessageReaction(index, 'heart')}
-                          className="text-muted-foreground hover:text-primary transition-colors"
+                          className={`transition-colors ${messageReactions[index]?.heart ? 'text-primary' : 'text-muted-foreground hover:text-primary'}`}
                         >
                           <Heart className="h-3.5 w-3.5" />
                         </button>
                         <button 
                           id={`message-reaction-${index}-smile`}
                           onClick={() => handleMessageReaction(index, 'smile')}
-                          className="text-muted-foreground hover:text-primary transition-colors"
+                          className={`transition-colors ${messageReactions[index]?.smile ? 'text-primary' : 'text-muted-foreground hover:text-primary'}`}
                         >
                           <Smile className="h-3.5 w-3.5" />
                         </button>

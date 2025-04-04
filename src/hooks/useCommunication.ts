@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ref, push, update, onValue, set, get } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
@@ -102,60 +103,83 @@ export const useCommunication = (roomId: string | null, userId: string) => {
   const sendChatMessage = useCallback(async (text: string) => {
     if (!roomId || !text.trim()) return;
     
+    const userName = localStorage.getItem("userName") || "Anonymous";
+    
     if (text.trim().startsWith('@AI')) {
+      // Extract the AI prompt (remove the @AI prefix)
       const aiPrompt = text.trim().substring(3).trim();
       
+      if (!aiPrompt) {
+        toast({
+          title: "Empty prompt",
+          description: "Please enter a question for the AI assistant",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Send the user message first
+      const userMessage: ChatMessage = {
+        userId,
+        userName,
+        text,
+        timestamp: Date.now()
+      };
+      
       try {
-        const response = await fetchGeminiResponse(aiPrompt);
-        
-        const userName = localStorage.getItem("userName") || "Anonymous";
-        
-        const userMessage: ChatMessage = {
-          userId,
-          userName,
-          text,
-          timestamp: Date.now()
-        };
-        
         const messagesRef = ref(rtdb, `rooms/${roomId}/messages`);
         await push(messagesRef, userMessage);
         
-        const aiMessage: ChatMessage = {
-          userId: 'ai-assistant',
-          userName: 'AI Assistant',
-          text: response,
-          timestamp: Date.now() + 100,
-          isAI: true
-        };
+        socket.emit("newMessage", { roomId, message: userMessage });
         
-        await push(messagesRef, aiMessage);
-        
-        socket.emit("newMessage", { roomId, message: aiMessage });
-        
-      } catch (error) {
-        console.error("Error processing AI request:", error);
-        toast({
-          title: "AI Error",
-          description: "Could not get a response from the AI. Please try again.",
-          variant: "destructive"
+        // Show a loading toast
+        const loadingToast = toast({
+          title: "AI is thinking...",
+          description: "Waiting for response from AI assistant",
+          duration: 10000
         });
         
-        const userName = localStorage.getItem("userName") || "Anonymous";
-        const message: ChatMessage = {
-          userId,
-          userName,
-          text,
-          timestamp: Date.now()
-        };
-        
-        const messagesRef = ref(rtdb, `rooms/${roomId}/messages`);
-        await push(messagesRef, message);
-        
-        socket.emit("newMessage", { roomId, message });
+        // Get AI response
+        try {
+          const aiResponse = await fetchGeminiResponse(aiPrompt);
+          
+          // Create AI message
+          const aiMessage: ChatMessage = {
+            userId: 'ai-assistant',
+            userName: 'AI Assistant',
+            text: aiResponse,
+            timestamp: Date.now() + 100,
+            isAI: true
+          };
+          
+          // Save AI message to database
+          await push(messagesRef, aiMessage);
+          
+          // Emit socket event for realtime updates
+          socket.emit("newMessage", { roomId, message: aiMessage });
+          
+          // Dismiss loading toast
+          toast.dismiss(loadingToast);
+          
+        } catch (error) {
+          console.error("Error fetching AI response:", error);
+          toast.dismiss(loadingToast);
+          toast({
+            title: "AI Error",
+            description: "Could not get a response from the AI. Please try again.",
+            variant: "destructive"
+          });
+        }
+      } catch (error) {
+        console.error("Error sending messages:", error);
+        toast({
+          title: "Error sending message",
+          description: "Your message could not be sent. Please try again.",
+          variant: "destructive"
+        });
       }
     } else {
-      const userName = localStorage.getItem("userName") || "Anonymous";
-      
+      // Regular message (not AI)
       const message: ChatMessage = {
         userId,
         userName,
@@ -231,7 +255,9 @@ export const useCommunication = (roomId: string | null, userId: string) => {
   const fetchGeminiResponse = async (prompt: string): Promise<string> => {
     try {
       const API_KEY = "AIzaSyCsvBo5fhK0k5kTeKJ_Wmorfuefw8g-6AA";
-      const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
+      const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+      
+      console.log("Sending prompt to Gemini:", prompt);
       
       const response = await fetch(`${API_URL}?key=${API_KEY}`, {
         method: "POST",
@@ -257,10 +283,13 @@ export const useCommunication = (roomId: string | null, userId: string) => {
       });
       
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Gemini API error:", errorText);
         throw new Error(`API request failed with status: ${response.status}`);
       }
       
       const data = await response.json();
+      console.log("Gemini API response:", data);
       
       if (data.candidates && 
           data.candidates[0] && 
@@ -269,6 +298,7 @@ export const useCommunication = (roomId: string | null, userId: string) => {
           data.candidates[0].content.parts[0].text) {
         return data.candidates[0].content.parts[0].text;
       } else {
+        console.error("Unexpected Gemini API response format:", data);
         throw new Error("Unexpected API response format");
       }
     } catch (error) {
