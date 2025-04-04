@@ -93,6 +93,26 @@ const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messag
     }
   };
 
+  // Function to format message text with line breaks and URLs as links
+  const formatMessageText = (text: string) => {
+    // First, escape any HTML to prevent XSS
+    const escapedText = text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    
+    // Convert URLs to clickable links
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const textWithLinks = escapedText.replace(urlRegex, 
+      (url) => `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-primary underline">${url}</a>`
+    );
+    
+    // Convert line breaks to <br> tags
+    const textWithLineBreaks = textWithLinks.replace(/\n/g, '<br />');
+    
+    return { __html: textWithLineBreaks };
+  };
+
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent side="left" className="flex flex-col p-0">
@@ -106,7 +126,9 @@ const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messag
                 {messages.map((msg, index) => (
                   <div 
                     key={`${msg.userId}-${msg.timestamp}-${index}`}
-                    className={`flex items-start gap-3 ${msg.isAI || msg.userId === 'ai-assistant' ? 'bg-secondary/30 p-3 rounded-lg' : ''}`}
+                    className={`flex items-start gap-3 ${msg.isAI || msg.userId === 'ai-assistant' 
+                      ? 'bg-secondary/30 p-3 rounded-lg' 
+                      : 'border-b pb-3'}`}
                   >
                     <Avatar className={`h-8 w-8 ${msg.isAI || msg.userId === 'ai-assistant' ? 'bg-primary/20' : ''}`}>
                       <AvatarFallback className="text-xs">
@@ -122,7 +144,10 @@ const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messag
                           {new Date(msg.timestamp).toLocaleTimeString()}
                         </span>
                       </div>
-                      <p className="mt-1">{msg.text}</p>
+                      <div 
+                        className="mt-1 whitespace-pre-wrap break-words" 
+                        dangerouslySetInnerHTML={formatMessageText(msg.text)}
+                      />
                       
                       {/* Message reactions */}
                       <div className="flex items-center gap-2 mt-2">
