@@ -93,7 +93,7 @@ const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messag
     }
   };
 
-  // Function to format message text with line breaks and URLs as links
+  // Function to format message text with line breaks, URLs as links, and basic Markdown
   const formatMessageText = (text: string) => {
     // First, escape any HTML to prevent XSS
     const escapedText = text
@@ -107,8 +107,21 @@ const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messag
       (url) => `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-primary underline">${url}</a>`
     );
     
-    // Convert line breaks to <br> tags
-    const textWithLineBreaks = textWithLinks.replace(/\n/g, '<br />');
+    // Convert Markdown-style bullet points (* item) to HTML list items
+    let textWithMarkdown = textWithLinks;
+    
+    // Replace bullet points with proper HTML
+    textWithMarkdown = textWithMarkdown.replace(/\n\*\s+([^\n]+)/g, (match, content) => {
+      return `<br/>• ${content}`;
+    });
+    
+    // Handle standalone bullet points at the beginning of text
+    textWithMarkdown = textWithMarkdown.replace(/^\*\s+([^\n]+)/g, (match, content) => {
+      return `• ${content}`;
+    });
+    
+    // Convert line breaks to <br> tags (after handling bullet points)
+    const textWithLineBreaks = textWithMarkdown.replace(/\n/g, '<br />');
     
     return { __html: textWithLineBreaks };
   };
