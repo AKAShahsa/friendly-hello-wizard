@@ -119,6 +119,15 @@ const ReactionButtons: React.FC<ReactionButtonsProps> = ({ reactions, sendReacti
   const handleReaction = (type: "thumbsUp" | "heart" | "smile") => {
     console.log(`Sending reaction: ${type}`);
     try {
+      // Add visual feedback animation
+      const buttonElement = document.querySelector(`#reaction-button-${type}`);
+      if (buttonElement) {
+        buttonElement.classList.add('animate-bounce');
+        setTimeout(() => {
+          buttonElement.classList.remove('animate-bounce');
+        }, 500);
+      }
+      
       sendReaction(type);
       setLastTriggered(type);
       
@@ -149,25 +158,28 @@ const ReactionButtons: React.FC<ReactionButtonsProps> = ({ reactions, sendReacti
   return (
     <div className="flex justify-center gap-4 mb-6">
       <Button 
+        id="reaction-button-thumbsUp"
         variant="outline" 
         onClick={() => handleReaction("thumbsUp")}
-        className="flex flex-col items-center"
+        className="flex flex-col items-center relative overflow-hidden hover:bg-primary/10 active:scale-95 transition-all"
       >
         <ThumbsUp className="h-5 w-5" />
         <span id="reaction-count-thumbsUp" className="text-xs mt-1">{reactions.thumbsUp || 0}</span>
       </Button>
       <Button 
+        id="reaction-button-heart"
         variant="outline" 
         onClick={() => handleReaction("heart")}
-        className="flex flex-col items-center"
+        className="flex flex-col items-center relative overflow-hidden hover:bg-primary/10 active:scale-95 transition-all"
       >
         <Heart className="h-5 w-5" />
         <span id="reaction-count-heart" className="text-xs mt-1">{reactions.heart || 0}</span>
       </Button>
       <Button 
+        id="reaction-button-smile"
         variant="outline" 
         onClick={() => handleReaction("smile")}
-        className="flex flex-col items-center"
+        className="flex flex-col items-center relative overflow-hidden hover:bg-primary/10 active:scale-95 transition-all"
       >
         <Smile className="h-5 w-5" />
         <span id="reaction-count-smile" className="text-xs mt-1">{reactions.smile || 0}</span>

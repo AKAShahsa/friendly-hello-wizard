@@ -109,12 +109,49 @@ socket.on("playbackStateChanged", (data) => {
 socket.on("reactionEffect", (data) => {
   console.log("Reaction effect from user:", data);
   if (data.userId && data.userName && data.reactionType) {
+    // Use canvas-confetti safely via a wrapper function
+    if (typeof window !== 'undefined' && window.confetti) {
+      triggerReactionEffects(data.reactionType);
+    }
+    
     toast({
       title: "Reaction",
       description: `${data.userName} reacted with ${data.reactionType}`,
     });
   }
 });
+
+// Safe wrapper for confetti effects
+const triggerReactionEffects = (type: string) => {
+  if (typeof window === 'undefined' || !window.confetti) return;
+  
+  try {
+    if (type === "thumbsUp") {
+      window.confetti({
+        particleCount: 50,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#4285F4', '#0F9D58']
+      });
+    } else if (type === "heart") {
+      window.confetti({
+        particleCount: 60,
+        spread: 100,
+        shapes: ['circle'],
+        colors: ['#ff0000', '#ff69b4', '#ff1493']
+      });
+    } else if (type === "smile") {
+      window.confetti({
+        particleCount: 100,
+        spread: 120,
+        gravity: 0.7,
+        colors: ['#FFD700', '#FFA500', '#FF8C00']
+      });
+    }
+  } catch (error) {
+    console.error("Error triggering confetti:", error);
+  }
+};
 
 // Export a function to manually reconnect if needed
 export const reconnectSocket = () => {
@@ -146,6 +183,7 @@ export const requestSync = (roomId, userId) => {
 // Broadcast reaction effect to all users in room
 export const broadcastReaction = (roomId, reactionType, userId, userName) => {
   if (!roomId) return;
+  console.log("Broadcasting reaction:", {roomId, reactionType, userId, userName});
   socket.emit("reactionEffect", { 
     roomId, 
     reactionType, 

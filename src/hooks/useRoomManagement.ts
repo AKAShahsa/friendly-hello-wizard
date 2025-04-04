@@ -146,6 +146,12 @@ export const useRoomManagement = (
         setReactions(roomData.reactions);
       }
       
+      // Process users data - transform object to array
+      if (roomData.users) {
+        const usersArray = Object.values(roomData.users) as User[];
+        setUsers(usersArray);
+      }
+      
       socket.emit("joinRoom", { roomId, userId, userName });
       
       toast({
@@ -172,6 +178,8 @@ export const useRoomManagement = (
     
     try {
       const userRef = ref(rtdb, `rooms/${roomId}/users/${userId}`);
+      
+      // Just update the active status, don't remove the user
       await update(userRef, {
         isActive: false,
         lastActive: Date.now()

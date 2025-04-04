@@ -28,6 +28,15 @@ export interface ChatMessage {
   userName: string;
   text: string;
   timestamp: number;
+  isAI?: boolean; // Optional flag to mark AI messages
+}
+
+export interface MessageReaction {
+  messageId: string;
+  userId: string;
+  userName: string;
+  reactionType: keyof Reaction;
+  timestamp: number;
 }
 
 export interface MusicContextType {
