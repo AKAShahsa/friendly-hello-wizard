@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ref, push, update, onValue, set, get } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
@@ -106,7 +105,6 @@ export const useCommunication = (roomId: string | null, userId: string) => {
     const userName = localStorage.getItem("userName") || "Anonymous";
     
     if (text.trim().startsWith('@AI')) {
-      // Extract the AI prompt (remove the @AI prefix)
       const aiPrompt = text.trim().substring(3).trim();
       
       if (!aiPrompt) {
@@ -118,7 +116,6 @@ export const useCommunication = (roomId: string | null, userId: string) => {
         return;
       }
       
-      // Send the user message first
       const userMessage: ChatMessage = {
         userId,
         userName,
@@ -132,18 +129,15 @@ export const useCommunication = (roomId: string | null, userId: string) => {
         
         socket.emit("newMessage", { roomId, message: userMessage });
         
-        // Show a loading toast
-        const loadingToast = toast({
+        const loadingToastId = toast({
           title: "AI is thinking...",
           description: "Waiting for response from AI assistant",
           duration: 10000
         });
         
-        // Get AI response
         try {
           const aiResponse = await fetchGeminiResponse(aiPrompt);
           
-          // Create AI message
           const aiMessage: ChatMessage = {
             userId: 'ai-assistant',
             userName: 'AI Assistant',
@@ -152,18 +146,18 @@ export const useCommunication = (roomId: string | null, userId: string) => {
             isAI: true
           };
           
-          // Save AI message to database
           await push(messagesRef, aiMessage);
           
-          // Emit socket event for realtime updates
           socket.emit("newMessage", { roomId, message: aiMessage });
           
-          // Dismiss loading toast
-          toast.dismiss(loadingToast);
-          
+          if (loadingToastId && typeof loadingToastId.dismiss === 'function') {
+            loadingToastId.dismiss();
+          }
         } catch (error) {
           console.error("Error fetching AI response:", error);
-          toast.dismiss(loadingToast);
+          if (loadingToastId && typeof loadingToastId.dismiss === 'function') {
+            loadingToastId.dismiss();
+          }
           toast({
             title: "AI Error",
             description: "Could not get a response from the AI. Please try again.",
@@ -179,7 +173,6 @@ export const useCommunication = (roomId: string | null, userId: string) => {
         });
       }
     } else {
-      // Regular message (not AI)
       const message: ChatMessage = {
         userId,
         userName,
