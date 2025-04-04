@@ -105,7 +105,7 @@ export const useCommunication = (roomId: string | null, userId: string) => {
     const userName = localStorage.getItem("userName") || "Anonymous";
     
     if (text.trim().startsWith('@AI')) {
-      const aiPrompt = text.trim().substring(3).trim();
+      let aiPrompt = text.trim().substring(3).trim();
       
       if (!aiPrompt) {
         toast({
@@ -134,9 +134,10 @@ export const useCommunication = (roomId: string | null, userId: string) => {
           description: "Waiting for response from AI assistant",
           duration: 10000
         });
-        
+      const customInstruction = "responce as a roast for this question.";
+       const promptForGemini = `${customInstruction}\n\n${aiPrompt}`;
         try {
-          const aiResponse = await fetchGeminiResponse(aiPrompt);
+          const aiResponse = await fetchGeminiResponse(promptForGemini);
           
           const aiMessage: ChatMessage = {
             userId: 'ai-assistant',
