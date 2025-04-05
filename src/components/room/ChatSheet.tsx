@@ -93,7 +93,7 @@ const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messag
     }
   };
 
-  // Function to format message text with line breaks, URLs as links, and basic Markdown
+  // Function to format message text with line breaks, URLs as links, and HTML formatting
   const formatMessageText = (text: string) => {
     // First, escape any HTML to prevent XSS
     const escapedText = text
@@ -101,27 +101,36 @@ const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messag
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
     
+    // Convert Markdown-style formatting to HTML tags
+    let formattedText = escapedText;
+    
+    // Bold: *text* or **text** -> <b>text</b>
+    formattedText = formattedText.replace(/\*\*(.*?)\*\*|\*(.*?)\*/g, (match, p1, p2) => {
+      const content = p1 || p2;
+      return `<b>${content}</b>`;
+    });
+    
     // Convert URLs to clickable links
     const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const textWithLinks = escapedText.replace(urlRegex, 
+    formattedText = formattedText.replace(urlRegex, 
       (url) => `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-primary underline">${url}</a>`
     );
     
-    // Convert Markdown-style bullet points (* item) to HTML list items
-    let textWithMarkdown = textWithLinks;
+    // Convert Markdown-style bullet points (* item) to HTML list items with proper spacing
+    let textWithBullets = formattedText;
     
-    // Replace bullet points with proper HTML
-    textWithMarkdown = textWithMarkdown.replace(/\n\*\s+([^\n]+)/g, (match, content) => {
-      return `<br/>• ${content}`;
+    // Handle bullet points with line breaks
+    textWithBullets = textWithBullets.replace(/\n\*\s+([^\n]+)/g, (match, content) => {
+      return `<br/><span class="flex ml-2"><span class="mr-2">•</span>${content}</span>`;
     });
     
     // Handle standalone bullet points at the beginning of text
-    textWithMarkdown = textWithMarkdown.replace(/^\*\s+([^\n]+)/g, (match, content) => {
-      return `• ${content}`;
+    textWithBullets = textWithBullets.replace(/^\*\s+([^\n]+)/g, (match, content) => {
+      return `<span class="flex ml-2"><span class="mr-2">•</span>${content}</span>`;
     });
     
     // Convert line breaks to <br> tags (after handling bullet points)
-    const textWithLineBreaks = textWithMarkdown.replace(/\n/g, '<br />');
+    const textWithLineBreaks = textWithBullets.replace(/\n/g, '<br />');
     
     return { __html: textWithLineBreaks };
   };
