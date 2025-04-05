@@ -286,7 +286,8 @@ export const useCommunication = (roomId: string | null, userId: string) => {
       // Here, we send the *processed* prompt and instructions to the AI.
       conversationHistory.push({
         role: 'user',
-        parts: [{ text: `${systemInstruction}\n\n${customInstruction}\n\nUser Question: ${aiPrompt}` }]
+        // Add the userName variable into the text string:
+        parts: [{ text: `${systemInstruction}\n\n${customInstruction}\n\nUser '${userName}' asks: ${aiPrompt}` }]
       });
 
 
