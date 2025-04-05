@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { ref, update, set, get, remove } from "firebase/database";
+import { ref, update, set, get } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
 import { toast } from "@/hooks/use-toast";
 import { Track } from "@/types/music";
@@ -65,6 +65,7 @@ export const useQueue = (
   };
 
   const removeFromQueue = (trackId: string) => {
+    // Only host should be able to remove from queue
     if (!isHost) {
       toast({
         title: "Not allowed",
@@ -78,24 +79,122 @@ export const useQueue = (
 
     if (roomId) {
       const trackRef = ref(rtdb, `rooms/${roomId}/queue/${trackId}`);
-      remove(trackRef)
-        .then(() => {
-          console.log(`Track with ID ${trackId} removed from Firebase queue`);
-        })
-        .catch(error => {
-          console.error("Error removing track from queue:", error);
-        });
+      set(trackRef, null);
+    }
+  };
+
+  const nextTrack = (currentTrack: Track | null) => {
+    if (!currentTrack || queue.length === 0) return null;
+
+    // Only host should be able to change tracks
+    if (!isHost) return null;
+
+    const currentIndex = queue.findIndex(track => track.id === currentTrack.id);
+    console.log("Current track index:", currentIndex, "Queue length:", queue.length);
+
+    if (currentIndex < queue.length - 1) {
+      const nextTrack = queue[currentIndex + 1];
+      console.log("Playing next track:", nextTrack);
+      playTrackFn(nextTrack);
+
+      if (roomId) {
+        const roomRef = ref(rtdb, `rooms/${roomId}`);
+        update(roomRef, { currentTrack: nextTrack })
+          .then(() => {
+            socket.emit("nextTrack", { roomId });
+            socket.emit("trackChanged", { roomId, trackId: nextTrack.id });
+          })
+          .catch(error => {
+            console.error("Error updating next track:", error);
+          });
+      }
+
+      return nextTrack;
+    } else {
+      console.log("No next track available");
+      return null;
+    }
+  };
+
+  const prevTrack = (currentTrack: Track | null) => {
+    if (!currentTrack || queue.length === 0) return null;
+
+    // Only host should be able to change tracks
+    if (!isHost) return null;
+
+    const currentIndex = queue.findIndex(track => track.id === currentTrack.id);
+    console.log("Current track index (prev):", currentIndex);
+
+    if (currentIndex > 0) {
+      const prevTrack = queue[currentIndex - 1];
+      console.log("Playing previous track:", prevTrack);
+      playTrackFn(prevTrack);
+
+      if (roomId) {
+        const roomRef = ref(rtdb, `rooms/${roomId}`);
+        update(roomRef, { currentTrack: prevTrack })
+          .then(() => {
+            socket.emit("prevTrack", { roomId });
+            socket.emit("trackChanged", { roomId, trackId: prevTrack.id });
+          })
+          .catch(error => {
+            console.error("Error updating previous track:", error);
+          });
+      }
+
+      return prevTrack;
+    } else {
+      console.log("No previous track available");
+      return null;
+    }
+  };
+
+  const addSongByUrl = async (
+    url: string,
+    title?: string,
+    artist?: string
+  ): Promise<boolean> => {
+    if (!url || !url.trim()) {
+      toast({
+        title: "Invalid URL",
+        description: "Please enter a valid audio URL",
+        variant: "destructive"
+      });
+      return false;
     }
 
+    const suggestedTitle =
+      title || url.split("/").pop()?.split(".")[0] || "Unknown Track";
+    const trackArtist = artist || "Unknown Artist";
+
+    const newTrack: Track = {
+      id: `track_${Date.now()}`,
+      title: suggestedTitle,
+      artist: trackArtist,
+      album: "Added via URL",
+      coverUrl:
+        "https://upload.wikimedia.org/wikipedia/commons/c/ca/CD-ROM.png",
+      audioUrl: url,
+      duration: 180
+    };
+
+    addToQueue(newTrack);
+
     toast({
-      title: "Removed from queue",
-      description: `Track has been removed from the queue`
+      title: "Song added",
+      description: `Added "${suggestedTitle}" to the queue`
     });
+
+    return true;
   };
 
   return {
     queue,
+    setQueue,
     addToQueue,
-    removeFromQueue
+    removeFromQueue,
+    nextTrack,
+    prevTrack,
+    addSongByUrl
   };
 };
