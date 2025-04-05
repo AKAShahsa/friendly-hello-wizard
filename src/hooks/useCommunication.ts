@@ -271,7 +271,7 @@ export const useCommunication = (roomId: string | null, userId: string) => {
       // Define base instructions for the AI
       const systemInstruction = `You are an AI assistant in a collaborative music chat room. Be helpful and concise. Consider the previous messages in this conversation history when formulating your response.`;
       // Example specific instruction (could be dynamic)
-      const customInstruction = "Respond as a roast for this question.";
+      const customInstruction = "Respond as a roast for this question if username is not taha.";
 
       // Format messages for Gemini API
       const conversationHistory: GeminiContent[] = recentMessages.map(msg => ({
