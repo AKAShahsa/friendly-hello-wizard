@@ -140,7 +140,7 @@ export const useCommunication = (roomId: string | null, userId: string) => {
     // 🚨 WARNING: Hardcoding API keys is insecure. Use environment variables.
     const API_KEY = "AIzaSyCsvBo5fhK0k5kTeKJ_Wmorfuefw8g-6AA"; // Use env var in production
     // 🚨 WARNING: Ensure this model name is correct and available for your key.
-    const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"; // Using 1.5 flash as it's generally good and supports history well
+    const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"; // Using 1.5 flash as it's generally good and supports history well
 
     // 🚨🚨 DEVELOPMENT/TESTING ONLY: DISABLING SAFETY SETTINGS 🚨🚨
     // WARNING: BLOCK_NONE disables content filtering. Can generate harmful content.
