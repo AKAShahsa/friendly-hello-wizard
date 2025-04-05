@@ -1,10 +1,25 @@
 
-import "canvas-confetti";
+import { LucideIcon } from 'lucide-react';
 
 declare global {
   interface Window {
-    confetti: import("canvas-confetti").CreateTypes;
+    confetti?: (options?: any) => void;
   }
 }
 
-export {};
+declare module "*.mp3" {
+  const src: string;
+  export default src;
+}
+
+declare module "*.wav" {
+  const src: string;
+  export default src;
+}
+
+declare module "*.ogg" {
+  const src: string;
+  export default src;
+}
+
+export {}

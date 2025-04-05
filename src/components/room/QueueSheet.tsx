@@ -42,7 +42,7 @@ const QueueSheet: React.FC<QueueSheetProps> = ({
   const [isClickDisabled, setIsClickDisabled] = React.useState(false);
 
   const handlePlayTrack = (track: Track) => {
-    if (isClickDisabled || lastClickedTrackId === track.id) {
+    if (isClickDisabled || lastClickedTrackId === track.id || currentTrack?.id === track.id) {
       return;
     }
     
@@ -53,10 +53,10 @@ const QueueSheet: React.FC<QueueSheetProps> = ({
       onPlayTrack(track);
     }
     
-    // Re-enable clicking after a short delay
+    // Re-enable clicking after a longer delay to prevent race conditions
     setTimeout(() => {
       setIsClickDisabled(false);
-    }, 1000);
+    }, 2000);
   };
 
   return (

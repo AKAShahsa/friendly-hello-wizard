@@ -121,6 +121,32 @@ socket.on("reactionEffect", (data) => {
   }
 });
 
+// Message reaction events
+socket.on("messageReaction", (data) => {
+  console.log("Message reaction from user:", data);
+});
+
+// Typing status events
+socket.on("userTyping", (data) => {
+  console.log("User typing:", data);
+});
+
+socket.on("userStoppedTyping", (data) => {
+  console.log("User stopped typing:", data);
+});
+
+// Toast broadcast events
+socket.on("toastBroadcast", (data) => {
+  console.log("Toast broadcast received:", data);
+  if (data.title && data.description) {
+    toast({
+      title: data.title,
+      description: data.description,
+      variant: data.variant || "default"
+    });
+  }
+});
+
 // Safe wrapper for confetti effects
 const triggerReactionEffects = (type: string) => {
   if (typeof window === 'undefined' || !window.confetti) return;
@@ -193,6 +219,19 @@ export const broadcastReaction = (roomId, reactionType, userId, userName) => {
   });
 };
 
+// Broadcast toast message to all users in room
+export const broadcastToast = (roomId, title, description, variant = "default") => {
+  if (!roomId) return;
+  console.log("Broadcasting toast:", {roomId, title, description, variant});
+  socket.emit("toastBroadcast", {
+    roomId,
+    title,
+    description,
+    variant,
+    timestamp: Date.now()
+  });
+};
+
 // Get current room ID
 export const getCurrentRoomId = () => currentRoomId;
 
@@ -200,3 +239,4 @@ export const getCurrentRoomId = () => currentRoomId;
 export const clearRoomId = () => {
   currentRoomId = null;
 };
+

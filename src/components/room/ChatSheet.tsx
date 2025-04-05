@@ -10,7 +10,9 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { ChatMessage } from "@/types/music";
 import { toast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useMusic } from "@/contexts/MusicContext";
 import EmojiPicker from "emoji-picker-react";
+import { socket } from "@/lib/socket";
 
 interface ChatSheetProps {
   isOpen: boolean;
@@ -26,8 +28,12 @@ const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messag
   const [showAIPopover, setShowAIPopover] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [messageReactions, setMessageReactions] = useState<{[messageIndex: number]: {[type: string]: string[]}}>({}); 
-  const isMobile = useIsMobile();
+  const [typingUsers, setTypingUsers] = useState<{[userId: string]: {name: string, timestamp: number}}>({});
   const inputRef = useRef<HTMLInputElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isMobile = useIsMobile();
+  const roomId = useMusic().roomId;
+  const users = useMusic().users;
   
   // Scroll to bottom of chat when new messages arrive
   useEffect(() => {
@@ -36,11 +42,91 @@ const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messag
     }
   }, [messages, isOpen]);
 
+  // Handle typing status
+  useEffect(() => {
+    if (!roomId) return;
+    
+    const handleTypingStart = (data: {roomId: string, userId: string, userName: string}) => {
+      if (data.roomId === roomId && data.userId !== localStorage.getItem("userId")) {
+        setTypingUsers(prev => ({
+          ...prev,
+          [data.userId]: {name: data.userName, timestamp: Date.now()}
+        }));
+      }
+    };
+    
+    const handleTypingStop = (data: {roomId: string, userId: string}) => {
+      if (data.roomId === roomId && data.userId !== localStorage.getItem("userId")) {
+        setTypingUsers(prev => {
+          const newState = {...prev};
+          delete newState[data.userId];
+          return newState;
+        });
+      }
+    };
+    
+    socket.on("userTyping", handleTypingStart);
+    socket.on("userStoppedTyping", handleTypingStop);
+    
+    // Clean up stale typing indicators every 10 seconds
+    const cleanupInterval = setInterval(() => {
+      const now = Date.now();
+      setTypingUsers(prev => {
+        const newState = {...prev};
+        let hasChanges = false;
+        
+        Object.entries(newState).forEach(([userId, data]) => {
+          if (now - data.timestamp > 5000) {
+            delete newState[userId];
+            hasChanges = true;
+          }
+        });
+        
+        return hasChanges ? newState : prev;
+      });
+    }, 10000);
+    
+    return () => {
+      socket.off("userTyping", handleTypingStart);
+      socket.off("userStoppedTyping", handleTypingStop);
+      clearInterval(cleanupInterval);
+    };
+  }, [roomId]);
+
+  const emitTypingStatus = () => {
+    if (!roomId) return;
+    
+    // Send typing status
+    const userId = localStorage.getItem("userId");
+    const userName = localStorage.getItem("userName") || "Anonymous";
+    
+    if (userId) {
+      socket.emit("userTyping", { roomId, userId, userName });
+      
+      // Clear any existing timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      
+      // Set new timeout to stop typing indicator after 3 seconds of inactivity
+      typingTimeoutRef.current = setTimeout(() => {
+        socket.emit("userStoppedTyping", { roomId, userId });
+      }, 3000);
+    }
+  };
+
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (message.trim()) {
       sendChatMessage(message);
       setMessage("");
+      
+      // Clear typing status
+      const userId = localStorage.getItem("userId");
+      if (roomId && userId && typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        socket.emit("userStoppedTyping", { roomId, userId });
+      }
     }
   };
 
@@ -104,25 +190,22 @@ const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messag
       duration: 1000
     });
     
+    // Broadcast reaction to other users
+    if (roomId) {
+      socket.emit("messageReaction", { 
+        roomId, 
+        messageIndex, 
+        reactionType, 
+        userId,
+        userName
+      });
+    }
+    
     // Animate the reaction button
     const buttonElement = document.querySelector(`#message-reaction-${messageIndex}-${reactionType}`);
     if (buttonElement) {
       buttonElement.classList.add('text-primary');
       buttonElement.classList.add('animate-pulse');
-      
-      // Add confetti effect
-      const rect = buttonElement.getBoundingClientRect();
-      const x = (rect.left + rect.right) / 2 / window.innerWidth;
-      const y = (rect.top + rect.bottom) / 2 / window.innerHeight;
-      
-      window.confetti({
-        particleCount: 30,
-        spread: 70,
-        origin: { x, y },
-        colors: reactionType === 'heart' ? ['#ff0000', '#ff69b4'] : 
-                reactionType === 'smile' ? ['#ffd700', '#ffa500'] : 
-                ['#4285F4', '#0F9D58']
-      });
       
       setTimeout(() => {
         buttonElement.classList.remove('animate-pulse');
@@ -183,6 +266,64 @@ const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messag
     if (!messageReactions[msgIndex]) return [];
     return messageReactions[msgIndex][reactionType] || [];
   };
+  
+  // Get active typing users
+  const getTypingUserNames = () => {
+    return Object.values(typingUsers).map(data => data.name);
+  };
+  
+  // Get user online status
+  const getUserOnlineStatus = (userId: string) => {
+    const user = users.find(u => u.id === userId);
+    return user?.isActive || false;
+  };
+
+  // Effect to listen for message reactions from other users
+  useEffect(() => {
+    if (!roomId) return;
+    
+    const handleMessageReaction = (data: {
+      roomId: string;
+      messageIndex: number;
+      reactionType: string;
+      userId: string;
+      userName: string;
+    }) => {
+      if (data.roomId === roomId) {
+        setMessageReactions(prev => {
+          const existingReactions = prev[data.messageIndex] || {};
+          const existingReactionUsers = existingReactions[data.reactionType] || [];
+          
+          // Check if user already reacted
+          if (existingReactionUsers.includes(data.userId)) {
+            return prev; // Don't allow double reactions from same user
+          }
+          
+          // Broadcast toast only if it's not the current user
+          if (data.userId !== localStorage.getItem("userId")) {
+            toast({
+              title: "Reaction",
+              description: `${data.userName} reacted with ${data.reactionType === "thumbsUp" ? "👍" : data.reactionType === "heart" ? "❤️" : "😊"}`
+            });
+          }
+          
+          return {
+            ...prev,
+            [data.messageIndex]: {
+              ...(existingReactions || {}),
+              [data.reactionType]: [...existingReactionUsers, data.userId]
+            }
+          };
+        });
+      }
+    };
+    
+    socket.on("messageReaction", handleMessageReaction);
+    
+    return () => {
+      socket.off("messageReaction", handleMessageReaction);
+    };
+  }, [roomId]);
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
@@ -204,11 +345,20 @@ const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messag
                       ? 'bg-secondary/30 p-3 rounded-lg' 
                       : 'border-b pb-3'}`}
                   >
-                    <Avatar className={`h-8 w-8 ${msg.isAI || msg.userId === 'ai-assistant' ? 'bg-primary/20' : ''}`}>
-                      <AvatarFallback className="text-xs">
-                        {msg.isAI || msg.userId === 'ai-assistant' ? 'AI' : msg.userName.substring(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
+                    <div className="relative">
+                      <Avatar className={`h-8 w-8 ${msg.isAI || msg.userId === 'ai-assistant' ? 'bg-primary/20' : ''}`}>
+                        <AvatarFallback className="text-xs">
+                          {msg.isAI || msg.userId === 'ai-assistant' ? 'AI' : msg.userName.substring(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      {msg.userId !== 'ai-assistant' && !msg.isAI && (
+                        <span 
+                          className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-background ${
+                            getUserOnlineStatus(msg.userId) ? 'bg-green-500' : 'bg-gray-400'
+                          }`}
+                        />
+                      )}
+                    </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <span className={`font-medium ${msg.isAI || msg.userId === 'ai-assistant' ? 'text-primary' : ''}`}>
@@ -324,6 +474,25 @@ const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messag
               </div>
             )}
           </ScrollArea>
+          
+          {/* Typing indicator */}
+          {getTypingUserNames().length > 0 && (
+            <div className="px-4 py-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <span className="flex items-center">
+                  <span className="h-2 w-2 rounded-full bg-primary animate-pulse mr-1"></span>
+                  <span className="h-2 w-2 rounded-full bg-primary animate-pulse delay-100 mr-1"></span>
+                  <span className="h-2 w-2 rounded-full bg-primary animate-pulse delay-200 mr-2"></span>
+                </span>
+                {getTypingUserNames().length === 1 ? (
+                  <span>{getTypingUserNames()[0]} is typing...</span>
+                ) : (
+                  <span>{getTypingUserNames().join(", ")} are typing...</span>
+                )}
+              </div>
+            </div>
+          )}
+          
           <form onSubmit={handleSendMessage} className="p-4 border-t">
             <div className="flex items-center gap-2 mb-2">
               <Popover open={showAIPopover} onOpenChange={setShowAIPopover}>
@@ -384,7 +553,10 @@ const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messag
               <Input
                 ref={inputRef}
                 value={message}
-                onChange={(e) => setMessage(e.target.value)}
+                onChange={(e) => {
+                  setMessage(e.target.value);
+                  emitTypingStatus();
+                }}
                 placeholder="Type a message... (use @AI for AI assistant)"
                 className="flex-1"
               />

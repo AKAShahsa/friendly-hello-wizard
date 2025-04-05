@@ -1,7 +1,8 @@
+
 import { useState, useEffect, useCallback, useRef } from "react";
-import { ref, push, update, onValue, set, get } from "firebase/database";
+import { ref, push, update, set, get } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
-import { socket, broadcastReaction } from "@/lib/socket";
+import { socket, broadcastReaction, broadcastToast } from "@/lib/socket";
 import { Reaction, ChatMessage } from "@/types/music";
 import { toast } from "@/hooks/use-toast";
 
@@ -151,6 +152,9 @@ export const useCommunication = (roomId: string | null, userId: string) => {
           
           socket.emit("newMessage", { roomId, message: aiMessage });
           
+          // Broadcast toast for AI response to all users
+          broadcastToast(roomId, "AI Response", `AI has responded to ${userName}'s question`);
+          
           if (loadingToastId && typeof loadingToastId.dismiss === 'function') {
             loadingToastId.dismiss();
           }
@@ -241,6 +245,13 @@ export const useCommunication = (roomId: string | null, userId: string) => {
       
       const userName = localStorage.getItem("userName") || "Anonymous";
       broadcastReaction(roomId, reactionType, userId, userName);
+      
+      // Broadcast toast message about the reaction
+      broadcastToast(
+        roomId, 
+        "New Reaction", 
+        `${userName} reacted with ${reactionType === "thumbsUp" ? "👍" : reactionType === "heart" ? "❤️" : "😊"}`
+      );
     } catch (error) {
       console.error("Error sending reaction:", error);
     }
@@ -310,3 +321,4 @@ export const useCommunication = (roomId: string | null, userId: string) => {
     sendReaction
   };
 };
+
