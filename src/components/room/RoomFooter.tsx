@@ -50,6 +50,16 @@ const RoomFooter: React.FC<RoomFooterProps> = ({
     // Initialize scroll state
     handleScroll();
     
+    // Add an initial nudge to show users they can scroll
+    if (container.scrollWidth > container.clientWidth) {
+      setTimeout(() => {
+        container.scrollLeft = 10;
+        setTimeout(() => {
+          container.scrollLeft = 0;
+        }, 300);
+      }, 500);
+    }
+    
     return () => {
       container.removeEventListener("scroll", handleScroll);
     };

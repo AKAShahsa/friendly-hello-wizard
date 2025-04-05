@@ -27,6 +27,7 @@ const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messag
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [messageReactions, setMessageReactions] = useState<{[messageIndex: number]: {[type: string]: string[]}}>({}); 
   const isMobile = useIsMobile();
+  const inputRef = useRef<HTMLInputElement>(null);
   
   // Scroll to bottom of chat when new messages arrive
   useEffect(() => {
@@ -44,21 +45,33 @@ const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messag
   };
 
   const handleAIAssistant = () => {
-    setMessage((prev) => {
-      // Only prepend @AI if it's not already there
-      if (!prev.trim().startsWith('@AI')) {
-        return '@AI ' + prev;
-      }
-      return prev;
-    });
+    const newMessage = message.trim().startsWith('@AI') ? message : '@AI ' + message;
+    setMessage(newMessage);
     setShowAIPopover(false);
+    
+    // Focus the input field after setting the message
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    }, 0);
   };
   
   const handleEmojiClick = (emojiData: any) => {
-    setMessage(prev => prev + emojiData.emoji);
+    const newMessage = message + emojiData.emoji;
+    setMessage(newMessage);
+    
+    // Only close the emoji picker on mobile
     if (isMobile) {
       setShowEmojiPicker(false);
     }
+    
+    // Focus the input field after selecting emoji
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    }, 0);
   };
   
   const handleMessageReaction = (messageIndex: number, reactionType: string) => {
@@ -369,6 +382,7 @@ const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messag
             </div>
             <div className="flex gap-2">
               <Input
+                ref={inputRef}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Type a message... (use @AI for AI assistant)"

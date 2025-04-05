@@ -31,14 +31,32 @@ const QueueSheet: React.FC<QueueSheetProps> = ({
   onPlayTrack 
 }) => {
   useEffect(() => {
-    console.log("Queue in QueueSheet:", queue);
-    console.log("Current track in QueueSheet:", currentTrack);
-  }, [queue, currentTrack]);
+    if (isOpen) {
+      console.log("Queue in QueueSheet:", queue);
+      console.log("Current track in QueueSheet:", currentTrack);
+    }
+  }, [queue, currentTrack, isOpen]);
+
+  // Prevent rapid song changes by debouncing the play track function
+  const [lastClickedTrackId, setLastClickedTrackId] = React.useState<string | null>(null);
+  const [isClickDisabled, setIsClickDisabled] = React.useState(false);
 
   const handlePlayTrack = (track: Track) => {
+    if (isClickDisabled || lastClickedTrackId === track.id) {
+      return;
+    }
+    
+    setIsClickDisabled(true);
+    setLastClickedTrackId(track.id);
+    
     if (onPlayTrack) {
       onPlayTrack(track);
     }
+    
+    // Re-enable clicking after a short delay
+    setTimeout(() => {
+      setIsClickDisabled(false);
+    }, 1000);
   };
 
   return (
@@ -71,6 +89,7 @@ const QueueSheet: React.FC<QueueSheetProps> = ({
                         size="icon" 
                         className="h-8 w-8"
                         onClick={() => handlePlayTrack(track)}
+                        disabled={isClickDisabled}
                       >
                         <Play className="h-4 w-4" />
                       </Button>
