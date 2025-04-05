@@ -261,7 +261,25 @@ export const useCommunication = (roomId: string | null, userId: string) => {
     try {
       const API_KEY = "AIzaSyCsvBo5fhK0k5kTeKJ_Wmorfuefw8g-6AA";
       const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
-      
+      const safetySettings = [
+        {
+          category: "HARM_CATEGORY_HARASSMENT",
+          threshold: "BLOCK_NONE",
+        },
+        {
+          category: "HARM_CATEGORY_HATE_SPEECH",
+          threshold: "BLOCK_NONE",
+        },
+        {
+          category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+          threshold: "BLOCK_NONE",
+        },
+        {
+          category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+          threshold: "BLOCK_NONE",
+        },
+      ];
+      // --- End Safety Settings Override ---
       console.log("Sending prompt to Gemini:", prompt);
       
       const response = await fetch(`${API_URL}?key=${API_KEY}`, {
@@ -284,6 +302,7 @@ export const useCommunication = (roomId: string | null, userId: string) => {
             temperature: 0.7,
             maxOutputTokens: 800,
           }
+          safetySettings: safetySettings
         }),
       });
       
