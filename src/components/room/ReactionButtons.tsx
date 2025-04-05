@@ -27,9 +27,28 @@ const ReactionButtons: React.FC<ReactionButtonsProps> = ({ reactions, sendReacti
 
   // Reference to avoid recreating handlers on each render
   const lastReactionsRef = useRef(reactions);
+  const reactionsCountRef = useRef({
+    thumbsUp: reactions.thumbsUp || 0,
+    heart: reactions.heart || 0,
+    smile: reactions.smile || 0
+  });
   
   useEffect(() => {
     lastReactionsRef.current = reactions;
+    reactionsCountRef.current = {
+      thumbsUp: reactions.thumbsUp || 0,
+      heart: reactions.heart || 0,
+      smile: reactions.smile || 0
+    };
+    
+    // Update the display when we receive updated reactions from database
+    const thumbsUpElement = document.querySelector(`#reaction-count-thumbsUp`);
+    const heartElement = document.querySelector(`#reaction-count-heart`);
+    const smileElement = document.querySelector(`#reaction-count-smile`);
+    
+    if (thumbsUpElement) thumbsUpElement.textContent = (reactions.thumbsUp || 0).toString();
+    if (heartElement) heartElement.textContent = (reactions.heart || 0).toString();
+    if (smileElement) smileElement.textContent = (reactions.smile || 0).toString();
   }, [reactions]);
 
   useEffect(() => {
@@ -128,16 +147,13 @@ const ReactionButtons: React.FC<ReactionButtonsProps> = ({ reactions, sendReacti
         }, 500);
       }
       
+      // Send the reaction to the database through the parent component
       sendReaction(type);
       setLastTriggered(type);
       
-      // Apply optimistic update to ensure the UI updates immediately
-      const reactionElement = document.querySelector(`#reaction-count-${type}`);
-      if (reactionElement) {
-        const currentCount = parseInt(reactionElement.textContent || "0");
-        reactionElement.textContent = (currentCount + 1).toString();
-      }
-
+      // Don't update UI here - let the database update flow through
+      // to ensure consistency across all clients
+      
       // Broadcast the reaction to all users in the room
       const roomId = getCurrentRoomId();
       const userId = localStorage.getItem("userId") || "";

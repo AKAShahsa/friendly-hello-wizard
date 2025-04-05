@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { ref, push, update, set, get } from "firebase/database";
+import { ref, push, update, set, get, onValue } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
 import { socket, broadcastReaction, broadcastToast } from "@/lib/socket";
 import { Reaction, ChatMessage } from "@/types/music";

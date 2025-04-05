@@ -42,10 +42,22 @@ const QueueSheet: React.FC<QueueSheetProps> = ({
   const [isClickDisabled, setIsClickDisabled] = React.useState(false);
 
   const handlePlayTrack = (track: Track) => {
-    if (isClickDisabled || lastClickedTrackId === track.id || currentTrack?.id === track.id) {
+    // Block clicks if another click is being processed or if the track is already playing
+    if (isClickDisabled || lastClickedTrackId === track.id) {
+      console.log("Click disabled or same track already clicked", {
+        isClickDisabled,
+        lastClickedTrackId,
+        trackId: track.id
+      });
       return;
     }
     
+    if (currentTrack?.id === track.id) {
+      console.log("Track already playing, ignoring click", track.id);
+      return;
+    }
+    
+    console.log("Processing click to play track:", track.id);
     setIsClickDisabled(true);
     setLastClickedTrackId(track.id);
     
@@ -56,7 +68,8 @@ const QueueSheet: React.FC<QueueSheetProps> = ({
     // Re-enable clicking after a longer delay to prevent race conditions
     setTimeout(() => {
       setIsClickDisabled(false);
-    }, 2000);
+      console.log("Re-enabling track selection clicks");
+    }, 3000);
   };
 
   return (
