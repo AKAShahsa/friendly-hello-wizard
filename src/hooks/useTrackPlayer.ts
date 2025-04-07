@@ -2,7 +2,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { Howl } from "howler";
 import { Track } from "../types/music";
-import { socket, syncPlaybackToRoom, requestSync } from "@/lib/socket";
+import { socket, syncPlaybackToRoom, requestSync, broadcastToast } from "@/lib/socket";
 import { ref, update, get, onValue } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
 import { toast } from "@/hooks/use-toast";
@@ -32,7 +32,7 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
       const playbackData = snapshot.val();
       console.log("Received playback state from DB:", playbackData);
       
-      // If we're not the host, sync to the host's playback state
+      //  If we're not the host, sync to the host's playback state
       if (!isHost && sound && currentTrack) {
         const serverTimestamp = playbackData.serverTimestamp || Date.now();
         const elapsedSinceUpdate = (Date.now() - serverTimestamp) / 1000;
@@ -209,6 +209,26 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
     }
     
     try {
+      // Handle Spotify tracks
+      const isSpotifyTrack = track.isSpotify || track.id.startsWith('spotify_');
+      
+      // For Spotify tracks without preview URLs, notify users
+      if (isSpotifyTrack && !track.audioUrl.includes('mp3')) {
+        // We'll still create a "dummy" Howl for tracking but notify that full playback requires Spotify account
+        if (roomId) {
+          broadcastToast(
+            roomId, 
+            "Spotify Track Info", 
+            "Full track requires a Spotify account. Using preview if available."
+          );
+        } else {
+          toast({
+            title: "Spotify Track Info",
+            description: "Full track requires a Spotify account. Using preview if available."
+          });
+        }
+      }
+      
       const newSound = new Howl({
         src: [track.audioUrl],
         html5: true,
@@ -278,11 +298,21 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
         onloaderror: (id, error) => {
           console.error(`Error loading audio: ${track.audioUrl}`, error);
           setIsPlaying(false);
-          toast({
-            title: "Error loading audio",
-            description: "Could not load the audio file. Please try another track.",
-            variant: "destructive"
-          });
+          
+          // Special handling for Spotify tracks - they might be preview-only or require authentication
+          if (isSpotifyTrack) {
+            toast({
+              title: "Spotify Playback Error",
+              description: "This track may require Spotify Premium or isn't available for preview.",
+              variant: "destructive"
+            });
+          } else {
+            toast({
+              title: "Error loading audio",
+              description: "Could not load the audio file. Please try another track.",
+              variant: "destructive"
+            });
+          }
         }
       });
       

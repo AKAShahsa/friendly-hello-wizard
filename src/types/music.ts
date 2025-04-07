@@ -1,4 +1,5 @@
 
+// Track interface
 export interface Track {
   id: string;
   title: string;
@@ -7,20 +8,20 @@ export interface Track {
   coverUrl: string;
   audioUrl: string;
   duration: number;
+  // Optional Spotify fields
+  spotifyId?: string;
+  isSpotify?: boolean;
 }
 
 export interface User {
   id: string;
   name: string;
+  isHost: boolean;
   isActive: boolean;
   lastActive: number;
-  isHost?: boolean;
-}
-
-export interface Reaction {
-  thumbsUp: number;
-  heart: number;
-  smile: number;
+  avatar?: string;
+  currentTime?: number;
+  typing?: boolean;
 }
 
 export interface ChatMessage {
@@ -28,15 +29,15 @@ export interface ChatMessage {
   userName: string;
   text: string;
   timestamp: number;
-  isAI?: boolean; // Optional flag to mark AI messages
+  isAI?: boolean;
+  reactions?: {[key: string]: string[]};
 }
 
-export interface MessageReaction {
-  messageId: string;
-  userId: string;
-  userName: string;
-  reactionType: keyof Reaction;
-  timestamp: number;
+export interface Reaction {
+  thumbsUp: number;
+  heart: number;
+  smile: number;
+  [key: string]: number;
 }
 
 export interface MusicContextType {
@@ -49,19 +50,19 @@ export interface MusicContextType {
   roomId: string | null;
   reactions: Reaction;
   messages: ChatMessage[];
-  createRoom: (name: string) => Promise<string>;
+  createRoom: (userName: string) => Promise<string>;
   joinRoom: (roomId: string, userName: string) => Promise<boolean>;
   leaveRoom: () => void;
   addToQueue: (track: Track) => void;
   removeFromQueue: (trackId: string) => void;
-  playTrack: (track: Track) => void;
+  playTrack: (track: Track, isRemoteChange?: boolean) => void;
   togglePlayPause: () => void;
-  nextTrack: () => void;
-  prevTrack: () => void;
+  nextTrack: () => Track | null;
+  prevTrack: () => Track | null;
   seek: (time: number) => void;
   setVolume: (volume: number) => void;
-  sendChatMessage: (message: string) => void;
-  sendReaction: (reactionType: keyof Reaction) => void;
+  sendChatMessage: (text: string) => void;
+  sendReaction: (type: keyof Reaction) => void;
   addSongByUrl: (url: string, title?: string, artist?: string) => Promise<boolean>;
-  transferHostStatus: (newHostId: string) => void;
+  transferHostStatus: (userId: string) => void;
 }
