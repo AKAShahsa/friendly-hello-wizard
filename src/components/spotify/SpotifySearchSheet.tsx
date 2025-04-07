@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Track } from "@/types/music";
 import { useSpotify } from "@/contexts/SpotifyContext";
-import { Loader2, Music, Play, Plus, Key } from "lucide-react";
+import { Loader2, Music, Play, Plus, Key, Info } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface SpotifySearchSheetProps {
@@ -106,7 +106,7 @@ const SpotifySearchSheet: React.FC<SpotifySearchSheetProps> = ({
         <SheetHeader>
           <SheetTitle>Spotify Search</SheetTitle>
           <SheetDescription>
-            Search for songs on Spotify and add them to the queue.
+            Search for songs on Spotify with free preview availability.
           </SheetDescription>
         </SheetHeader>
         
@@ -130,7 +130,7 @@ const SpotifySearchSheet: React.FC<SpotifySearchSheetProps> = ({
               </Button>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              You need a valid Spotify API token for search to work
+              Only songs with free previews will be shown
             </p>
           </div>
           
@@ -151,6 +151,11 @@ const SpotifySearchSheet: React.FC<SpotifySearchSheetProps> = ({
               {error}
             </div>
           )}
+          
+          <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+            <Info className="h-3 w-3" />
+            <span>Only showing tracks with free 30-second previews</span>
+          </div>
           
           <div className="mt-6 space-y-2">
             {searchResults.map((track) => (
@@ -203,7 +208,7 @@ const SpotifySearchSheet: React.FC<SpotifySearchSheetProps> = ({
             
             {searchResults.length === 0 && !isLoading && searchQuery && (
               <div className="text-center py-8 text-muted-foreground">
-                No results found
+                No free preview tracks found. Try another search.
               </div>
             )}
             

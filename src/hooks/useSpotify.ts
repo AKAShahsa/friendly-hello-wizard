@@ -84,7 +84,7 @@ export const useSpotifyApi = (apiToken?: string) => {
       const response = await fetch(
         `${SPOTIFY_API_BASE}/search?q=${encodeURIComponent(
           query
-        )}&type=track&limit=20`,
+        )}&type=track&limit=50`, // Increased limit to find more tracks with previews
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -97,7 +97,21 @@ export const useSpotifyApi = (apiToken?: string) => {
       }
 
       const data = await response.json();
-      setSearchResults(data.tracks.items);
+      
+      // Filter tracks to only include those with preview_url available
+      const tracksWithPreviews = data.tracks.items.filter(
+        (track: SpotifyTrack) => track.preview_url !== null
+      );
+      
+      setSearchResults(tracksWithPreviews);
+      
+      if (tracksWithPreviews.length === 0 && data.tracks.items.length > 0) {
+        toast({
+          title: "Limited Results",
+          description: "Found tracks, but none with free previews. Try another search.",
+          variant: "default",
+        });
+      }
     } catch (error) {
       console.error("Error searching tracks:", error);
       setError("Failed to search tracks");
@@ -119,8 +133,8 @@ export const useSpotifyApi = (apiToken?: string) => {
       artist: spotifyTrack.artists.map(artist => artist.name).join(", "),
       album: spotifyTrack.album.name,
       coverUrl: spotifyTrack.album.images[0]?.url || "https://upload.wikimedia.org/wikipedia/commons/c/ca/CD-ROM.png",
-      // For non-premium, we use preview_url if available, otherwise external URL for full playback
-      audioUrl: spotifyTrack.preview_url || spotifyTrack.external_urls.spotify,
+      // For free API token, we use preview_url which will now always be available
+      audioUrl: spotifyTrack.preview_url || "",
       duration: Math.floor(spotifyTrack.duration_ms / 1000), // Convert ms to seconds
       spotifyId: spotifyTrack.id, // Add Spotify ID for reference
       isSpotify: true,
