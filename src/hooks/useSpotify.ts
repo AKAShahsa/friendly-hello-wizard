@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { Track } from "@/types/music";
 import { toast } from "@/hooks/use-toast";
@@ -18,10 +19,11 @@ export interface SpotifyTrack {
     spotify: string;
   };
   preview_url: string | null;
+  uri?: string; // Make uri optional for compatibility
 }
 
 export const useSpotifyApi = (apiToken?: string) => {
-  const [token, setToken] = useState(apiToken || DEFAULT_SPOTIFY_TOKEN);
+  const [token, setToken] = useState<string>(apiToken || localStorage.getItem("spotify_token") || DEFAULT_SPOTIFY_TOKEN);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<SpotifyTrack[]>([]);

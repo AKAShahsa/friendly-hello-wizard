@@ -22,14 +22,20 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
     token,
     setToken,
     searchTracks,
-    searchResults,
+    searchResults: apiSearchResults,
     isLoading,
     error,
     convertToAppTrack
   } = useSpotifyApi();
 
+  // Convert search results to match the expected SpotifyTrack type
+  const searchResults: SpotifyTrack[] = apiSearchResults.map(track => ({
+    ...track,
+    uri: track.external_urls.spotify // Add the uri property using the external_urls.spotify
+  }));
+
   // Store value to be provided
-  const value = {
+  const value: SpotifyContextType = {
     token,
     setToken,
     searchTracks,

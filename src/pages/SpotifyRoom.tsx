@@ -36,8 +36,8 @@ const SpotifyRoom = () => {
     joinRoom, playTrack, roomId: contextRoomId, addToQueue
   } = useMusic();
   
-  // Get Spotify context
-  const { spotifyToken, setSpotifyToken } = useSpotify();
+  // Get Spotify context - update property names
+  const { token: spotifyToken, setToken: setSpotifyToken } = useSpotify();
   
   // State for UI elements
   const [isUsersOpen, setIsUsersOpen] = useState(false);
@@ -115,6 +115,7 @@ const SpotifyRoom = () => {
     };
   }, [roomId, joinRoom, leaveRoom, hasJoinedRoom, contextRoomId, joinAttempted]);
 
+  // Handle leaving room
   const handleLeaveRoom = useCallback(() => {
     leaveRoom();
     navigate("/");
