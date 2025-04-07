@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Track } from "@/types/music";
 import { useSpotify } from "@/contexts/SpotifyContext";
-import { Loader2, Music, Play, Plus, Key, Info } from "lucide-react";
+import { Loader2, Music, Play, Plus, Key, Info, Search } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface SpotifySearchSheetProps {
@@ -37,16 +37,16 @@ const SpotifySearchSheet: React.FC<SpotifySearchSheetProps> = ({
     }
   }, [spotifyToken, setToken]);
   
-  // Handle search
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
-    await searchTracks(searchQuery);
-  };
+  // Handle search on each keystroke
+  useEffect(() => {
+    searchTracks(searchQuery);
+  }, [searchQuery, searchTracks]);
   
   // Handle key press (Enter) for search
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
-      handleSearch();
+      // Apply the search (though it's already happening in real-time)
+      searchTracks(searchQuery);
     }
   };
   
@@ -134,16 +134,15 @@ const SpotifySearchSheet: React.FC<SpotifySearchSheetProps> = ({
             </p>
           </div>
           
-          <div className="flex gap-2">
+          <div className="flex gap-2 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
-              placeholder="Search for songs, artists, or albums"
+              placeholder="Start typing to search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={handleKeyPress}
+              className="pl-10"
             />
-            <Button onClick={handleSearch} disabled={isLoading}>
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
-            </Button>
           </div>
           
           {error && (
@@ -154,10 +153,10 @@ const SpotifySearchSheet: React.FC<SpotifySearchSheetProps> = ({
           
           <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
             <Info className="h-3 w-3" />
-            <span>Only showing tracks with free 30-second previews</span>
+            <span>Search instantly shows tracks with free 30-second previews</span>
           </div>
           
-          <div className="mt-6 space-y-2">
+          <div className="mt-6 space-y-2 max-h-[60vh] overflow-y-auto pr-1">
             {searchResults.map((track) => (
               <div 
                 key={track.id} 
@@ -215,6 +214,12 @@ const SpotifySearchSheet: React.FC<SpotifySearchSheetProps> = ({
             {isLoading && (
               <div className="flex justify-center py-8">
                 <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              </div>
+            )}
+            
+            {!searchQuery && !isLoading && (
+              <div className="text-center py-8 text-muted-foreground">
+                Start typing to see matching songs with free previews
               </div>
             )}
           </div>

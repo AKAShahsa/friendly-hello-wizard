@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext } from 'react';
 import { SpotifyTrack } from '@/types/spotify';
 import { Track } from '@/types/music';
 import { useSpotifyApi } from '@/hooks/useSpotify';
