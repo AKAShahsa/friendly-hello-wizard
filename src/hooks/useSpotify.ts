@@ -2,31 +2,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { Track } from "@/types/music";
 import { toast } from "@/hooks/use-toast";
+import { SpotifyTrack } from "@/types/spotify";
 
 const SPOTIFY_API_BASE = "https://api.spotify.com/v1";
-const DEFAULT_SPOTIFY_TOKEN = "YOUR_SPOTIFY_TOKEN"; // Will be replaced by actual token
-
-export interface SpotifyTrack {
-  id: string;
-  name: string;
-  artists: { 
-    id?: string;
-    name: string;
-    uri?: string;
-  }[];
-  album: {
-    id?: string;
-    name: string;
-    images: { url: string }[];
-    uri?: string;
-  };
-  duration_ms: number;
-  external_urls: {
-    spotify: string;
-  };
-  preview_url: string | null;
-  uri?: string; // Make uri optional for compatibility
-}
+const DEFAULT_SPOTIFY_TOKEN = ""; // Empty default token
 
 export const useSpotifyApi = (apiToken?: string) => {
   const [token, setToken] = useState<string>(apiToken || localStorage.getItem("spotify_token") || DEFAULT_SPOTIFY_TOKEN);
@@ -50,6 +29,10 @@ export const useSpotifyApi = (apiToken?: string) => {
 
   // Check if token is valid
   const checkTokenValidity = useCallback(async (): Promise<boolean> => {
+    if (!token) {
+      return false;
+    }
+    
     try {
       const response = await fetch(`${SPOTIFY_API_BASE}/me`, {
         headers: {
@@ -75,6 +58,17 @@ export const useSpotifyApi = (apiToken?: string) => {
     setError(null);
 
     try {
+      if (!token) {
+        setError("No Spotify token provided");
+        toast({
+          title: "Spotify Error",
+          description: "Please enter your Spotify token to search tracks.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
       const isValid = await checkTokenValidity();
       if (!isValid) {
         setError("Spotify token is invalid or expired");

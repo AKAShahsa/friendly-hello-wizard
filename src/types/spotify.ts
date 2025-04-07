@@ -12,8 +12,8 @@ export interface SpotifyTrack {
     name: string;
     images: {
       url: string;
-      height: number;
-      width: number;
+      height?: number;
+      width?: number;
     }[];
     uri: string;
   };

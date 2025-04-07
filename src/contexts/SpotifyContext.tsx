@@ -28,34 +28,12 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
     convertToAppTrack
   } = useSpotifyApi();
 
-  // Convert search results to match the expected SpotifyTrack type
-  const searchResults: SpotifyTrack[] = apiSearchResults.map(track => ({
-    ...track,
-    id: track.id,
-    name: track.name,
-    artists: track.artists.map(artist => ({
-      id: artist.id || '',
-      name: artist.name,
-      uri: artist.uri || ''
-    })),
-    album: {
-      id: track.album.id || '',
-      name: track.album.name,
-      images: track.album.images,
-      uri: track.album.uri || ''
-    },
-    duration_ms: track.duration_ms,
-    uri: track.external_urls.spotify,
-    preview_url: track.preview_url,
-    external_urls: track.external_urls
-  }));
-
   // Store value to be provided
   const value: SpotifyContextType = {
     token,
     setToken,
     searchTracks,
-    searchResults,
+    searchResults: apiSearchResults,
     isLoading,
     error,
     convertToAppTrack

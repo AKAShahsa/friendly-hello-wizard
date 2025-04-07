@@ -4,8 +4,8 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Track } from "@/types/music";
-import { useSpotifyApi } from "@/hooks/useSpotify";
-import { Loader2, Music, Play, Plus } from "lucide-react";
+import { useSpotify } from "@/contexts/SpotifyContext";
+import { Loader2, Music, Play, Plus, Key } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface SpotifySearchSheetProps {
@@ -26,12 +26,14 @@ const SpotifySearchSheet: React.FC<SpotifySearchSheetProps> = ({
   roomId
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
-  const { searchTracks, searchResults, isLoading, error, convertToAppTrack, setToken } = useSpotifyApi(spotifyToken);
+  const [tokenInput, setTokenInput] = useState(spotifyToken || "");
+  const { searchTracks, searchResults, isLoading, error, convertToAppTrack, setToken, token } = useSpotify();
   
   // Set token when it changes
   useEffect(() => {
     if (spotifyToken) {
       setToken(spotifyToken);
+      setTokenInput(spotifyToken);
     }
   }, [spotifyToken, setToken]);
   
@@ -45,6 +47,17 @@ const SpotifySearchSheet: React.FC<SpotifySearchSheetProps> = ({
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       handleSearch();
+    }
+  };
+  
+  // Update token
+  const handleUpdateToken = () => {
+    if (tokenInput.trim()) {
+      setToken(tokenInput);
+      toast({
+        title: "Token Updated",
+        description: "Spotify token has been updated"
+      });
     }
   };
   
@@ -98,6 +111,29 @@ const SpotifySearchSheet: React.FC<SpotifySearchSheetProps> = ({
         </SheetHeader>
         
         <div className="py-4">
+          {/* Spotify Token Input */}
+          <div className="mb-4">
+            <label htmlFor="spotify-token" className="text-sm font-medium mb-1 block">
+              Spotify Token
+            </label>
+            <div className="flex gap-2">
+              <Input
+                id="spotify-token"
+                type="password"
+                value={tokenInput}
+                onChange={(e) => setTokenInput(e.target.value)}
+                placeholder="Enter your Spotify token"
+              />
+              <Button onClick={handleUpdateToken}>
+                <Key className="h-4 w-4 mr-2" />
+                Update
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              You need a valid Spotify API token for search to work
+            </p>
+          </div>
+          
           <div className="flex gap-2">
             <Input
               placeholder="Search for songs, artists, or albums"
