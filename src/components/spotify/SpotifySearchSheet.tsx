@@ -1,22 +1,20 @@
 
 import React, { useState, useEffect } from "react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Music, Play, Plus } from "lucide-react";
-import { useSpotify, SpotifyTrack } from "@/hooks/useSpotify";
 import { Track } from "@/types/music";
+import { useSpotifyApi } from "@/hooks/useSpotify";
+import { Loader2, Music, Play, Plus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { socket, broadcastToast } from "@/lib/socket";
 
 interface SpotifySearchSheetProps {
   isOpen: boolean;
-  onOpenChange: (isOpen: boolean) => void;
+  onOpenChange: (open: boolean) => void;
   onAddTrack: (track: Track) => void;
-  onPlayTrack?: (track: Track) => void;
+  onPlayTrack: (track: Track) => void;
   spotifyToken: string;
-  roomId?: string | null;
+  roomId?: string;
 }
 
 const SpotifySearchSheet: React.FC<SpotifySearchSheetProps> = ({
@@ -25,141 +23,160 @@ const SpotifySearchSheet: React.FC<SpotifySearchSheetProps> = ({
   onAddTrack,
   onPlayTrack,
   spotifyToken,
-  roomId,
+  roomId
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [lastAddedTrackId, setLastAddedTrackId] = useState<string | null>(null);
-  const { searchTracks, searchResults, isLoading, convertToAppTrack } = useSpotify(spotifyToken);
-
-  // Debounce search input
+  const { searchTracks, searchResults, isLoading, error, convertToAppTrack, setToken } = useSpotifyApi(spotifyToken);
+  
+  // Set token when it changes
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      setDebouncedQuery(searchQuery);
-    }, 500);
-    return () => clearTimeout(timeoutId);
-  }, [searchQuery]);
-
-  // Perform search when debounced query changes
-  useEffect(() => {
-    if (debouncedQuery) {
-      searchTracks(debouncedQuery);
+    if (spotifyToken) {
+      setToken(spotifyToken);
     }
-  }, [debouncedQuery, searchTracks]);
-
-  const handleAddTrack = (spotifyTrack: SpotifyTrack) => {
-    const appTrack = convertToAppTrack(spotifyTrack);
-    
-    // Prevent duplicate rapid adds
-    if (lastAddedTrackId === spotifyTrack.id) return;
-    
-    setLastAddedTrackId(spotifyTrack.id);
-    setTimeout(() => setLastAddedTrackId(null), 3000);
-    
-    onAddTrack(appTrack);
-    
-    if (roomId) {
-      broadcastToast(
-        roomId,
-        "Spotify track added",
-        `"${spotifyTrack.name}" by ${spotifyTrack.artists[0]?.name} added to queue`
-      );
-    } else {
+  }, [spotifyToken, setToken]);
+  
+  // Handle search
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
+    await searchTracks(searchQuery);
+  };
+  
+  // Handle key press (Enter) for search
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      handleSearch();
+    }
+  };
+  
+  // Handle add to queue
+  const handleAddToQueue = (spotifyTrack: any) => {
+    try {
+      const track = convertToAppTrack(spotifyTrack);
+      onAddTrack(track);
       toast({
-        title: "Spotify track added",
-        description: `"${spotifyTrack.name}" by ${spotifyTrack.artists[0]?.name} added to queue`,
+        title: "Added to Queue",
+        description: `${track.title} by ${track.artist} added to queue`
+      });
+    } catch (error) {
+      console.error("Error adding to queue:", error);
+      toast({
+        title: "Error",
+        description: "Could not add track to queue",
+        variant: "destructive"
       });
     }
   };
-
-  const handlePlayTrack = (spotifyTrack: SpotifyTrack) => {
-    if (!onPlayTrack) return;
-    
-    const appTrack = convertToAppTrack(spotifyTrack);
-    onPlayTrack(appTrack);
-    
-    if (roomId) {
-      broadcastToast(
-        roomId,
-        "Now playing Spotify track",
-        `"${spotifyTrack.name}" by ${spotifyTrack.artists[0]?.name}`
-      );
+  
+  // Handle play now
+  const handlePlayNow = (spotifyTrack: any) => {
+    try {
+      const track = convertToAppTrack(spotifyTrack);
+      onPlayTrack(track);
+      toast({
+        title: "Now Playing",
+        description: `${track.title} by ${track.artist}`
+      });
+      onOpenChange(false); // Close sheet after playing
+    } catch (error) {
+      console.error("Error playing track:", error);
+      toast({
+        title: "Error",
+        description: "Could not play track",
+        variant: "destructive"
+      });
     }
   };
-
+  
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent side="right">
         <SheetHeader>
-          <SheetTitle>Search Spotify</SheetTitle>
+          <SheetTitle>Spotify Search</SheetTitle>
+          <SheetDescription>
+            Search for songs on Spotify and add them to the queue.
+          </SheetDescription>
         </SheetHeader>
-        <div className="mt-4 space-y-4">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        
+        <div className="py-4">
+          <div className="flex gap-2">
             <Input
-              placeholder="Search tracks..."
+              placeholder="Search for songs, artists, or albums"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
+              onKeyDown={handleKeyPress}
             />
+            <Button onClick={handleSearch} disabled={isLoading}>
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
+            </Button>
           </div>
-
-          {isLoading && (
-            <div className="flex items-center justify-center py-8">
-              <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-primary"></div>
+          
+          {error && (
+            <div className="bg-destructive/10 text-destructive px-4 py-2 rounded-md mt-4">
+              {error}
             </div>
           )}
-
-          <ScrollArea className="h-[calc(100vh-200px)]">
-            {searchResults.length > 0 ? (
-              <div className="space-y-3">
-                {searchResults.map((track) => (
-                  <div
-                    key={track.id}
-                    className="flex items-center gap-3 p-2 rounded-md hover:bg-secondary/80"
-                  >
-                    <img
-                      src={track.album.images[0]?.url || "https://upload.wikimedia.org/wikipedia/commons/c/ca/CD-ROM.png"}
-                      alt={track.name}
-                      className="h-12 w-12 rounded-md object-cover"
+          
+          <div className="mt-6 space-y-2">
+            {searchResults.map((track) => (
+              <div 
+                key={track.id} 
+                className="flex items-center gap-3 p-3 rounded-md hover:bg-accent border"
+              >
+                <div className="w-12 h-12 flex-shrink-0">
+                  {track.album.images[0] ? (
+                    <img 
+                      src={track.album.images[0].url} 
+                      alt={track.album.name}
+                      className="w-full h-full object-cover rounded-md"
                     />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate">{track.name}</div>
-                      <div className="text-sm text-muted-foreground truncate">
-                        {track.artists.map((artist) => artist.name).join(", ")}
-                      </div>
+                  ) : (
+                    <div className="w-full h-full bg-muted flex items-center justify-center rounded-md">
+                      <Music className="w-6 h-6 text-muted-foreground" />
                     </div>
-                    <div className="flex gap-1">
-                      {onPlayTrack && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => handlePlayTrack(track)}
-                        >
-                          <Play className="h-4 w-4" />
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => handleAddTrack(track)}
-                        disabled={lastAddedTrackId === track.id}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  )}
+                </div>
+                
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-medium text-sm leading-tight truncate">
+                    {track.name}
+                  </h4>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {track.artists.map(a => a.name).join(", ")}
+                  </p>
+                </div>
+                
+                <div className="flex gap-1">
+                  <Button 
+                    size="icon" 
+                    variant="outline"
+                    onClick={() => handleAddToQueue(track)}
+                    title="Add to queue"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    size="icon"
+                    onClick={() => handlePlayNow(track)}
+                    title="Play now"
+                  >
+                    <Play className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-            ) : searchQuery.length > 0 && !isLoading ? (
+            ))}
+            
+            {searchResults.length === 0 && !isLoading && searchQuery && (
               <div className="text-center py-8 text-muted-foreground">
-                <Music className="h-12 w-12 mx-auto mb-2 opacity-20" />
-                <p>No tracks found</p>
+                No results found
               </div>
-            ) : null}
-          </ScrollArea>
+            )}
+            
+            {isLoading && (
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              </div>
+            )}
+          </div>
         </div>
       </SheetContent>
     </Sheet>

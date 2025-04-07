@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { Track } from "@/types/music";
 import { toast } from "@/hooks/use-toast";
@@ -21,7 +20,7 @@ export interface SpotifyTrack {
   preview_url: string | null;
 }
 
-export const useSpotify = (apiToken?: string) => {
+export const useSpotifyApi = (apiToken?: string) => {
   const [token, setToken] = useState(apiToken || DEFAULT_SPOTIFY_TOKEN);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

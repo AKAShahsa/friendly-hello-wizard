@@ -1,10 +1,11 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMusic } from "@/contexts/MusicContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
+import { useSpotify } from "@/contexts/SpotifyContext";
 
 // Import components
 import RoomHeader from "@/components/room/RoomHeader";
@@ -35,6 +36,9 @@ const SpotifyRoom = () => {
     joinRoom, playTrack, roomId: contextRoomId, addToQueue
   } = useMusic();
   
+  // Get Spotify context
+  const { spotifyToken, setSpotifyToken } = useSpotify();
+  
   // State for UI elements
   const [isUsersOpen, setIsUsersOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -47,11 +51,6 @@ const SpotifyRoom = () => {
   const [joinAttempted, setJoinAttempted] = useState(false);
   
   // Spotify token
-  const [spotifyToken, setSpotifyToken] = useState<string>(() => {
-    return localStorage.getItem("spotify_token") || 
-      "BQDNSeFyqkGqdI36sZWBI13TEHTCJoA4PTaDtxnwdl7L475AVbiJ88jNm4KrxSBnPOVOiXfGOn1J91ZSvM24U149WjSTtgQkkUFHvXAWmgQKFmzSdQAAG7t2gOEjhzzgtsHHD2aEuhQb4IplMmRw8CQr1e0P-ZFY-MO9GMqXRdWYHD6eAdUf14I9sYkqdEKEabfmoDhZ87pYDFWRwjdQ2292h6-EchpS97TxHoZjDKwn7yW0pb_-ZW79BsfS";
-  });
-
   useEffect(() => {
     // Store token in localStorage for persistence
     localStorage.setItem("spotify_token", spotifyToken);
