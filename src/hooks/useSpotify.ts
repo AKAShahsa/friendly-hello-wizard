@@ -9,10 +9,16 @@ const DEFAULT_SPOTIFY_TOKEN = "YOUR_SPOTIFY_TOKEN"; // Will be replaced by actua
 export interface SpotifyTrack {
   id: string;
   name: string;
-  artists: { name: string }[];
+  artists: { 
+    id?: string;
+    name: string;
+    uri?: string;
+  }[];
   album: {
+    id?: string;
     name: string;
     images: { url: string }[];
+    uri?: string;
   };
   duration_ms: number;
   external_urls: {

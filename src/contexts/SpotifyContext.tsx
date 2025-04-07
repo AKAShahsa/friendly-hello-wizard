@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import { SpotifyTrack } from '@/types/spotify';
 import { Track } from '@/types/music';
 import { useSpotifyApi } from '@/hooks/useSpotify';
@@ -31,7 +31,23 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Convert search results to match the expected SpotifyTrack type
   const searchResults: SpotifyTrack[] = apiSearchResults.map(track => ({
     ...track,
-    uri: track.external_urls.spotify // Add the uri property using the external_urls.spotify
+    id: track.id,
+    name: track.name,
+    artists: track.artists.map(artist => ({
+      id: artist.id || '',
+      name: artist.name,
+      uri: artist.uri || ''
+    })),
+    album: {
+      id: track.album.id || '',
+      name: track.album.name,
+      images: track.album.images,
+      uri: track.album.uri || ''
+    },
+    duration_ms: track.duration_ms,
+    uri: track.external_urls.spotify,
+    preview_url: track.preview_url,
+    external_urls: track.external_urls
   }));
 
   // Store value to be provided
