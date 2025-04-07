@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMusic } from "@/contexts/MusicContext";
@@ -12,7 +13,6 @@ import RoomHeader from "@/components/room/RoomHeader";
 import TrackDisplay from "@/components/room/TrackDisplay";
 import ReactionButtons from "@/components/room/ReactionButtons";
 import PlayerControls from "@/components/room/PlayerControls";
-import RoomFooter from "@/components/room/RoomFooter";
 import QueueSheet from "@/components/room/QueueSheet";
 import UsersSheet from "@/components/room/UsersSheet";
 import ChatSheet from "@/components/room/ChatSheet";
@@ -20,6 +20,8 @@ import AddSongSheet from "@/components/room/AddSongSheet";
 import UserAvatars from "@/components/room/UserAvatars";
 import SpotifySearchSheet from "@/components/spotify/SpotifySearchSheet";
 import SpotifyButton from "@/components/spotify/SpotifyButton";
+import YouTubeMusicButton from "@/components/youtube/YouTubeMusicButton";
+import YouTubeMusicSearchSheet from "@/components/youtube/YouTubeMusicSearchSheet";
 
 // This is a wrapper component that adds Spotify functionality while maintaining
 // all existing functionality of the original Room component
@@ -45,16 +47,11 @@ const SpotifyRoom = () => {
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const [isAddSongOpen, setIsAddSongOpen] = useState(false);
   const [isSpotifyOpen, setIsSpotifyOpen] = useState(false);
+  const [isYouTubeMusicOpen, setIsYouTubeMusicOpen] = useState(false);
   const [hasJoinedRoom, setHasJoinedRoom] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [joinAttempted, setJoinAttempted] = useState(false);
-  
-  // Spotify token
-  useEffect(() => {
-    // Store token in localStorage for persistence
-    localStorage.setItem("spotify_token", spotifyToken);
-  }, [spotifyToken]);
   
   // Join room on mount if roomId is available - only once
   useEffect(() => {
@@ -137,6 +134,11 @@ const SpotifyRoom = () => {
     setIsSpotifyOpen(prev => !prev);
   }, []);
 
+  // Toggle YouTube Music search sheet
+  const toggleYouTubeMusicSearch = useCallback(() => {
+    setIsYouTubeMusicOpen(prev => !prev);
+  }, []);
+
   // Show loading state
   if (isLoading) {
     return (
@@ -194,7 +196,7 @@ const SpotifyRoom = () => {
           />
         </main>
 
-        {/* Footer with Spotify Button Added */}
+        {/* Footer with Spotify Button and YouTube Music Button Added */}
         <div className="py-4 px-6 border-t bg-background/80 backdrop-blur-sm">
           <div className="flex justify-between items-center max-w-md mx-auto">
             <Button
@@ -242,8 +244,11 @@ const SpotifyRoom = () => {
               <span className="sr-only">Chat</span>
             </Button>
             
-            {/* New Spotify Button */}
+            {/* Spotify Button */}
             <SpotifyButton onClick={toggleSpotifySearch} />
+            
+            {/* New YouTube Music Button */}
+            <YouTubeMusicButton onClick={toggleYouTubeMusicSearch} />
             
             <Button
               variant="outline"
@@ -343,13 +348,22 @@ const SpotifyRoom = () => {
           addSongByUrl={addSongByUrl}
         />
         
-        {/* Spotify Search Sheet (New) */}
+        {/* Spotify Search Sheet */}
         <SpotifySearchSheet
           isOpen={isSpotifyOpen}
           onOpenChange={setIsSpotifyOpen}
           onAddTrack={addToQueue}
           onPlayTrack={playTrack}
           spotifyToken={spotifyToken}
+          roomId={roomId}
+        />
+        
+        {/* YouTube Music Search Sheet (New) */}
+        <YouTubeMusicSearchSheet
+          isOpen={isYouTubeMusicOpen}
+          onOpenChange={setIsYouTubeMusicOpen}
+          onAddTrack={addToQueue}
+          onPlayTrack={playTrack}
           roomId={roomId}
         />
       </div>

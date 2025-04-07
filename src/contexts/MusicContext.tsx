@@ -79,7 +79,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setReactions, setQueue, setCurrentTrackState
   );
 
-  const nextTrack = () => {
+  const nextTrack = (): Track | null => {
     if (isUserHostRef.current) {
       return queueNextTrack(currentTrack);
     } else {
@@ -92,7 +92,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
   
-  const prevTrack = () => {
+  const prevTrack = (): Track | null => {
     if (isUserHostRef.current) {
       return queuePrevTrack(currentTrack);
     } else {
