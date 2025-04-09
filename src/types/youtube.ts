@@ -27,3 +27,11 @@ export interface YouTubeMusicApiResponse {
   message?: string;
   data?: any;
 }
+
+// YouTube Player Interface - for managing the iframe player
+export interface YouTubePlayerState {
+  player: any;
+  isReady: boolean;
+  isPlaying: boolean;
+  currentVideoId: string | null;
+}

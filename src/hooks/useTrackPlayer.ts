@@ -5,6 +5,7 @@ import { socket, syncPlaybackToRoom, requestSync, broadcastToast } from "@/lib/s
 import { ref, update, get, onValue } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
 import { toast } from "@/hooks/use-toast";
+import { useYouTubeMusic } from "@/hooks/useYouTubeMusic";
 
 export const useTrackPlayer = (roomId: string | null, userId: string, volume: number, isHost: boolean) => {
   const [sound, setSound] = useState<Howl | null>(null);
@@ -12,13 +13,25 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   
+  const { 
+    playYouTubeVideo, 
+    pauseVideo: pauseYouTubeVideo,
+    resumeVideo: resumeYouTubeVideo,
+    seekTo: seekYouTubeVideo,
+    stopVideo: stopYouTubeVideo,
+    getCurrentTime: getYouTubeCurrentTime,
+    setVolume: setYouTubeVolume,
+    playerState
+  } = useYouTubeMusic();
+  
   const prevTrackRef = useRef<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const isUpdatingRef = useRef(false); // Prevent update loops
+  const isUpdatingRef = useRef(false);
   const lastSyncTimeRef = useRef(Date.now());
   const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSyncDataRef = useRef<any>(null);
   const syncThrottleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isYouTubeTrackRef = useRef(false);
 
   useEffect(() => {
     if (!roomId) return;
@@ -30,188 +43,101 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
       const playbackData = snapshot.val();
       console.log("Received playback state from DB:", playbackData);
       
-      if (!isHost && sound && currentTrack) {
+      if (!isHost && currentTrack) {
         const serverTimestamp = playbackData.serverTimestamp || Date.now();
         const elapsedSinceUpdate = (Date.now() - serverTimestamp) / 1000;
         let syncPosition = playbackData.position + (playbackData.isPlaying ? elapsedSinceUpdate : 0);
         
-        if (Math.abs(sound.seek() as number - syncPosition) > 1.5) {
-          console.log(`Syncing position from ${sound.seek() as number} to ${syncPosition}`);
-          sound.seek(syncPosition);
-        }
-        
-        if (playbackData.isPlaying && !isPlaying) {
-          sound.play();
-          setIsPlaying(true);
-        } else if (!playbackData.isPlaying && isPlaying) {
-          sound.pause();
-          setIsPlaying(false);
-        }
-      }
-    });
-    
-    return () => unsubscribe();
-  }, [roomId, isHost, sound, currentTrack, isPlaying]);
-
-  useEffect(() => {
-    if (!roomId || !userId) return;
-    
-    const handleSyncRequest = (data: any) => {
-      if (data.roomId === roomId && isHost && sound) {
-        const trackPosition = sound.seek();
-        const position = typeof trackPosition === 'number' ? trackPosition : 0;
-        
-        const playbackStateRef = ref(rtdb, `rooms/${roomId}/playbackState`);
-        update(playbackStateRef, {
-          trackId: currentTrack?.id,
-          isPlaying: isPlaying,
-          position: position,
-          serverTimestamp: Date.now()
-        });
-        
-        syncPlaybackToRoom(roomId, {
-          trackId: currentTrack?.id,
-          isPlaying: isPlaying,
-          position: position,
-          timestamp: Date.now()
-        });
-      }
-    };
-    
-    const handleSyncPlayback = (data: any) => {
-      if (data.roomId === roomId && !isHost) {
-        if (data.trackId && currentTrack?.id !== data.trackId) {
-          const trackRef = ref(rtdb, `rooms/${roomId}/queue/${data.trackId}`);
-          get(trackRef).then((snapshot) => {
-            if (snapshot.exists()) {
-              const track = snapshot.val() as Track;
-              playTrack(track, true, data.position);
-            }
-          });
-        } else if (data.trackId && currentTrack?.id === data.trackId && sound) {
-          const currentPos = sound.seek() as number;
-          if (Math.abs(currentPos - data.position) > 1.5) {
-            console.log(`Seeking to ${data.position} (was at ${currentPos})`);
-            sound.seek(data.position);
+        if (isYouTubeTrackRef.current) {
+          if (Math.abs(getYouTubeCurrentTime() - syncPosition) > 1.5) {
+            console.log(`Syncing YouTube position to ${syncPosition}`);
+            seekYouTubeVideo(syncPosition);
           }
           
-          if (data.isPlaying && !isPlaying) {
+          if (playbackData.isPlaying && !isPlaying) {
+            resumeYouTubeVideo();
+            setIsPlaying(true);
+          } else if (!playbackData.isPlaying && isPlaying) {
+            pauseYouTubeVideo();
+            setIsPlaying(false);
+          }
+        } else if (sound) {
+          if (Math.abs(sound.seek() as number - syncPosition) > 1.5) {
+            console.log(`Syncing position from ${sound.seek() as number} to ${syncPosition}`);
+            sound.seek(syncPosition);
+          }
+          
+          if (playbackData.isPlaying && !isPlaying) {
             sound.play();
             setIsPlaying(true);
-          } else if (!data.isPlaying && isPlaying) {
+          } else if (!playbackData.isPlaying && isPlaying) {
             sound.pause();
             setIsPlaying(false);
           }
         }
       }
-    };
+    });
     
-    const handlePlaybackStateChanged = (data: any) => {
-      if (data.roomId === roomId && !isHost && sound) {
-        if (data.state === "play" && !isPlaying) {
-          sound.play();
-          setIsPlaying(true);
-        } else if (data.state === "pause" && isPlaying) {
-          sound.pause();
-          setIsPlaying(false);
-        } else if (data.state === "seek" && data.position !== undefined) {
-          sound.seek(data.position);
-          setCurrentTime(data.position);
-        }
-      }
-    };
-    
-    const handleTrackChanged = (data: any) => {
-      if (data.roomId === roomId && !isHost && data.trackId) {
-        const trackRef = ref(rtdb, `rooms/${roomId}/queue/${data.trackId}`);
-        get(trackRef).then((snapshot) => {
-          if (snapshot.exists()) {
-            const track = snapshot.val() as Track;
-            playTrack(track, true);
-          }
-        });
-      }
-    };
+    return () => unsubscribe();
+  }, [roomId, isHost, sound, currentTrack, isPlaying, pauseYouTubeVideo, resumeYouTubeVideo, getYouTubeCurrentTime, seekYouTubeVideo]);
 
-    socket.on("syncRequest", handleSyncRequest);
-    socket.on("syncPlayback", handleSyncPlayback);
-    socket.on("trackChanged", handleTrackChanged);
-    socket.on("playbackStateChanged", handlePlaybackStateChanged);
+  useEffect(() => {
+    if (!isYouTubeTrackRef.current || !isPlaying) return;
     
-    if (!isHost) {
-      requestSync(roomId, userId);
-    }
-    
-    if (isHost && !syncIntervalRef.current) {
-      syncIntervalRef.current = setInterval(() => {
-        if (currentTrack && sound) {
-          const trackPosition = sound.seek();
-          const position = typeof trackPosition === 'number' ? trackPosition : 0;
-          
-          const playbackStateRef = ref(rtdb, `rooms/${roomId}/playbackState`);
-          update(playbackStateRef, {
-            trackId: currentTrack.id,
-            isPlaying: isPlaying,
-            position: position,
-            serverTimestamp: Date.now()
-          });
-          
-          syncPlaybackToRoom(roomId, {
-            trackId: currentTrack.id,
-            isPlaying: isPlaying,
-            position: position,
-            timestamp: Date.now()
-          });
-        }
-      }, 3000);
-    }
-    
-    return () => {
-      socket.off("syncRequest", handleSyncRequest);
-      socket.off("syncPlayback", handleSyncPlayback);
-      socket.off("trackChanged", handleTrackChanged);
-      socket.off("playbackStateChanged", handlePlaybackStateChanged);
+    const youtubeTimeTracker = setInterval(() => {
+      const currentVideoTime = getYouTubeCurrentTime();
+      setCurrentTime(currentVideoTime);
       
-      if (syncIntervalRef.current) {
-        clearInterval(syncIntervalRef.current);
-        syncIntervalRef.current = null;
+      if (roomId && !isUpdatingRef.current) {
+        isUpdatingRef.current = true;
+        const userRef = ref(rtdb, `rooms/${roomId}/users/${userId}`);
+        update(userRef, {
+          currentTime: currentVideoTime,
+          lastActive: Date.now()
+        })
+          .catch(error => {
+            console.error("Error updating time in Firebase:", error);
+          })
+          .finally(() => {
+            isUpdatingRef.current = false;
+          });
       }
-    };
-  }, [roomId, userId, isHost, sound, isPlaying, currentTrack]);
+    }, 1000);
+    
+    return () => clearInterval(youtubeTimeTracker);
+  }, [isPlaying, roomId, userId, getYouTubeCurrentTime]);
 
   const playTrack = useCallback((track: Track, isRemoteChange = false, startPosition = 0): void => {
     if (!track || prevTrackRef.current === track.id) return;
     prevTrackRef.current = track.id;
     
+    const isYouTubeTrack = track.isYouTubeMusic || track.youtubeId;
+    isYouTubeTrackRef.current = isYouTubeTrack;
+    
     if (sound) {
       sound.stop();
       sound.unload();
+      setSound(null);
+    }
+    
+    if (playerState.isPlaying) {
+      stopYouTubeVideo();
     }
     
     try {
-      const isSpotifyTrack = track.isSpotify || track.id.startsWith('spotify_');
-      
-      if (isSpotifyTrack && !track.audioUrl.includes('mp3')) {
-        if (roomId) {
-          broadcastToast(
-            roomId, 
-            "Spotify Track Info", 
-            "Full track requires a Spotify account. Using preview if available."
-          );
-        } else {
-          toast({
-            title: "Spotify Track Info",
-            description: "Full track requires a Spotify account. Using preview if available."
-          });
-        }
-      }
-      
-      const newSound = new Howl({
-        src: [track.audioUrl],
-        html5: true,
-        volume: volume,
-        onplay: () => {
+      if (isYouTubeTrack && track.youtubeId) {
+        const success = playYouTubeVideo(track.youtubeId);
+        
+        if (success) {
           setIsPlaying(true);
+          setCurrentTrack(track);
+          setCurrentTime(startPosition);
+          
+          setYouTubeVolume(Math.round(volume * 100));
+          
+          if (startPosition > 0) {
+            seekYouTubeVideo(startPosition);
+          }
           
           if (roomId && isHost && !isUpdatingRef.current) {
             isUpdatingRef.current = true;
@@ -242,63 +168,125 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
                 isUpdatingRef.current = false;
               });
           }
-        },
-        onpause: () => {
-          setIsPlaying(false);
-          
-          if (roomId && isHost && !isRemoteChange && !isUpdatingRef.current) {
-            isUpdatingRef.current = true;
-            
-            const playbackStateRef = ref(rtdb, `rooms/${roomId}/playbackState`);
-            update(playbackStateRef, {
-              isPlaying: false,
-              position: newSound.seek() as number,
-              serverTimestamp: Date.now()
-            })
-            .then(() => {
-              socket.emit("pause", { roomId });
-              socket.emit("playbackStateChanged", { roomId, state: "pause" });
-            })
-            .catch(error => {
-              console.error("Error updating playback state on pause:", error);
-            })
-            .finally(() => {
-              isUpdatingRef.current = false;
-            });
-          }
-        },
-        onend: () => {
-          setIsPlaying(false);
-        },
-        onloaderror: (id, error) => {
-          console.error(`Error loading audio: ${track.audioUrl}`, error);
-          setIsPlaying(false);
-          
-          if (isSpotifyTrack) {
-            toast({
-              title: "Spotify Playback Error",
-              description: "This track may require Spotify Premium or isn't available for preview.",
-              variant: "destructive"
-            });
+        } else {
+          toast({
+            title: "YouTube Playback Error",
+            description: "Could not play this YouTube track. Please try another.",
+            variant: "destructive"
+          });
+        }
+      } else {
+        const isSpotifyTrack = track.isSpotify || track.id.startsWith('spotify_');
+        
+        if (isSpotifyTrack && !track.audioUrl.includes('mp3')) {
+          if (roomId) {
+            broadcastToast(
+              roomId, 
+              "Spotify Track Info", 
+              "Full track requires a Spotify account. Using preview if available."
+            );
           } else {
             toast({
-              title: "Error loading audio",
-              description: "Could not load the audio file. Please try another track.",
-              variant: "destructive"
+              title: "Spotify Track Info",
+              description: "Full track requires a Spotify account. Using preview if available."
             });
           }
         }
-      });
-      
-      newSound.play();
-      
-      if (startPosition > 0) {
-        newSound.seek(startPosition);
+        
+        const newSound = new Howl({
+          src: [track.audioUrl],
+          html5: true,
+          volume: volume,
+          onplay: () => {
+            setIsPlaying(true);
+            
+            if (roomId && isHost && !isUpdatingRef.current) {
+              isUpdatingRef.current = true;
+              
+              const roomRef = ref(rtdb, `rooms/${roomId}`);
+              const playbackStateRef = ref(rtdb, `rooms/${roomId}/playbackState`);
+              
+              Promise.all([
+                update(roomRef, { currentTrack: track }),
+                update(playbackStateRef, {
+                  trackId: track.id,
+                  isPlaying: true,
+                  position: startPosition,
+                  serverTimestamp: Date.now()
+                })
+              ])
+                .then(() => {
+                  if (!isRemoteChange) {
+                    socket.emit("play", { roomId, trackId: track.id });
+                    socket.emit("trackChanged", { roomId, trackId: track.id });
+                    socket.emit("playbackStateChanged", { roomId, state: "play" });
+                  }
+                })
+                .catch(error => {
+                  console.error("Error updating room on play:", error);
+                })
+                .finally(() => {
+                  isUpdatingRef.current = false;
+                });
+            }
+          },
+          onpause: () => {
+            setIsPlaying(false);
+            
+            if (roomId && isHost && !isUpdatingRef.current && !isPlaying) {
+              isUpdatingRef.current = true;
+              
+              const playbackStateRef = ref(rtdb, `rooms/${roomId}/playbackState`);
+              update(playbackStateRef, {
+                isPlaying: false,
+                position: newSound.seek() as number,
+                serverTimestamp: Date.now()
+              })
+              .then(() => {
+                socket.emit("pause", { roomId });
+                socket.emit("playbackStateChanged", { roomId, state: "pause" });
+              })
+              .catch(error => {
+                console.error("Error updating playback state on pause:", error);
+              })
+              .finally(() => {
+                isUpdatingRef.current = false;
+              });
+            }
+          },
+          onend: () => {
+            setIsPlaying(false);
+          },
+          onloaderror: (id, error) => {
+            console.error(`Error loading audio: ${track.audioUrl}`, error);
+            setIsPlaying(false);
+            
+            if (isSpotifyTrack) {
+              toast({
+                title: "Spotify Playback Error",
+                description: "This track may require Spotify Premium or isn't available for preview.",
+                variant: "destructive"
+              });
+            } else {
+              toast({
+                title: "Error loading audio",
+                description: "Could not load the audio file. Please try another track.",
+                variant: "destructive"
+              });
+            }
+          }
+        });
+        
+        newSound.play();
+        
+        if (startPosition > 0) {
+          newSound.seek(startPosition);
+        }
+        
+        setSound(newSound);
+        setCurrentTrack(track);
+        setCurrentTime(startPosition);
       }
-      
-      setSound(newSound);
-      setCurrentTrack(track);
-      setCurrentTime(startPosition);
     } catch (error) {
       console.error("Error playing track:", error);
       toast({
@@ -307,23 +295,60 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
         variant: "destructive"
       });
     }
-  }, [volume, roomId, sound, isHost]);
+  }, [volume, roomId, sound, isHost, playYouTubeVideo, playerState.isPlaying, stopYouTubeVideo, seekYouTubeVideo, setYouTubeVolume]);
 
   const togglePlayPause = useCallback(() => {
-    if (!sound) return;
-    
-    if (isPlaying) {
-      sound.pause();
-    } else {
-      sound.play();
+    if (isYouTubeTrackRef.current) {
+      if (isPlaying) {
+        pauseYouTubeVideo();
+        setIsPlaying(false);
+      } else {
+        resumeYouTubeVideo();
+        setIsPlaying(true);
+      }
+      
+      if (roomId && isHost && !isUpdatingRef.current && currentTrack) {
+        isUpdatingRef.current = true;
+        
+        const playbackStateRef = ref(rtdb, `rooms/${roomId}/playbackState`);
+        update(playbackStateRef, {
+          isPlaying: !isPlaying,
+          position: getYouTubeCurrentTime(),
+          serverTimestamp: Date.now()
+        })
+        .then(() => {
+          socket.emit(isPlaying ? "pause" : "play", { roomId });
+          socket.emit("playbackStateChanged", { 
+            roomId, 
+            state: isPlaying ? "pause" : "play" 
+          });
+        })
+        .catch(error => {
+          console.error("Error updating playback state:", error);
+        })
+        .finally(() => {
+          isUpdatingRef.current = false;
+        });
+      }
+    } else if (sound) {
+      if (isPlaying) {
+        sound.pause();
+      } else {
+        sound.play();
+      }
     }
-  }, [sound, isPlaying]);
+  }, [sound, isPlaying, isHost, roomId, currentTrack, pauseYouTubeVideo, resumeYouTubeVideo, getYouTubeCurrentTime]);
 
   const seek = useCallback((time: number) => {
-    if (!sound) return;
-    
-    sound.seek(time);
-    setCurrentTime(time);
+    if (isYouTubeTrackRef.current) {
+      seekYouTubeVideo(time);
+      setCurrentTime(time);
+    } else if (sound) {
+      sound.seek(time);
+      setCurrentTime(time);
+    } else {
+      return;
+    }
     
     if (roomId && isHost && !isUpdatingRef.current) {
       isUpdatingRef.current = true;
@@ -351,13 +376,15 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
         isUpdatingRef.current = false;
       });
     }
-  }, [sound, roomId, isHost, currentTrack, isPlaying]);
+  }, [sound, roomId, isHost, currentTrack, isPlaying, seekYouTubeVideo]);
 
   const setVolume = useCallback((newVolume: number) => {
-    if (sound) {
+    if (isYouTubeTrackRef.current) {
+      setYouTubeVolume(Math.round(newVolume * 100));
+    } else if (sound) {
       sound.volume(newVolume);
     }
-  }, [sound]);
+  }, [sound, setYouTubeVolume]);
 
   const setupTimeTracking = useCallback((setCurrentTimeCallback: (time: number) => void) => {
     if (timerRef.current) {
@@ -365,14 +392,20 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
       timerRef.current = null;
     }
     
-    if (!sound || !isPlaying) return () => {};
+    if (!sound && !isYouTubeTrackRef.current) return () => {};
+    if (!isPlaying) return () => {};
     
     timerRef.current = setInterval(() => {
       try {
-        if (!sound) return;
+        let timeValue = 0;
         
-        const time = sound.seek();
-        const timeValue = typeof time === 'number' ? time : 0;
+        if (isYouTubeTrackRef.current) {
+          timeValue = getYouTubeCurrentTime();
+        } else if (sound) {
+          const time = sound.seek();
+          timeValue = typeof time === 'number' ? time : 0;
+        }
+        
         setCurrentTimeCallback(timeValue);
         
         if (roomId && !isUpdatingRef.current) {
@@ -400,13 +433,16 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
         timerRef.current = null;
       }
     };
-  }, [sound, isPlaying, roomId, userId]);
+  }, [sound, isPlaying, roomId, userId, getYouTubeCurrentTime]);
   
   useEffect(() => {
     return () => {
       if (sound) {
         sound.stop();
         sound.unload();
+      }
+      if (isYouTubeTrackRef.current) {
+        stopYouTubeVideo();
       }
       if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -421,7 +457,7 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
         syncThrottleTimeoutRef.current = null;
       }
     };
-  }, [sound]);
+  }, [sound, stopYouTubeVideo]);
 
   useEffect(() => {
     setVolume(volume);

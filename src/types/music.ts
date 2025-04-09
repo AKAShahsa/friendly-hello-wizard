@@ -1,4 +1,3 @@
-
 // Track interface
 export interface Track {
   id: string;
@@ -11,6 +10,9 @@ export interface Track {
   // Optional Spotify fields
   spotifyId?: string;
   isSpotify?: boolean;
+  // Optional YouTube Music fields
+  youtubeId?: string;
+  isYouTubeMusic?: boolean;
 }
 
 export interface User {

@@ -26,7 +26,14 @@ const YouTubeMusicSearchSheet: React.FC<YouTubeMusicSearchSheetProps> = ({
   roomId
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
-  const { searchTracks, searchResults, isLoading, error, convertToAppTrack } = useYouTubeMusic();
+  const { 
+    searchTracks, 
+    searchResults, 
+    isLoading, 
+    error, 
+    convertToAppTrack,
+    playYouTubeVideo 
+  } = useYouTubeMusic();
   
   useEffect(() => {
     if (isOpen && searchQuery.trim().length > 0) {
@@ -45,18 +52,34 @@ const YouTubeMusicSearchSheet: React.FC<YouTubeMusicSearchSheetProps> = ({
 
   const handlePlayTrack = (ytTrack: YouTubeMusicTrack) => {
     const track = convertToAppTrack(ytTrack);
-    onPlayTrack(track);
-    toast({
-      title: "Now playing",
-      description: `Playing ${track.title} by ${track.artist}`
-    });
-    onOpenChange(false);
+    
+    // First check if the YouTube player can play this video
+    const canPlay = playYouTubeVideo(ytTrack.videoId);
+    
+    if (canPlay) {
+      onPlayTrack(track);
+      toast({
+        title: "Now playing",
+        description: `Playing ${track.title} by ${track.artist}`
+      });
+      onOpenChange(false);
+    }
   };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim().length > 0) {
       searchTracks(searchQuery);
+    }
+  };
+
+  // Handle search as you type
+  const handleSearchInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+    
+    if (query.trim().length > 1) {
+      searchTracks(query);
     }
   };
 
@@ -76,7 +99,7 @@ const YouTubeMusicSearchSheet: React.FC<YouTubeMusicSearchSheetProps> = ({
                 type="text"
                 placeholder="Search for songs..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={handleSearchInput}
                 className="flex-1"
               />
               <Button type="submit" disabled={isLoading}>
