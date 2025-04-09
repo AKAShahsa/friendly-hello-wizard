@@ -37,6 +37,38 @@ const DEFAULT_TRACKS = [
     album: "PSY 6 (Six Rules), Part 1",
     thumbnail: "https://i.ytimg.com/vi/9bZkp7q19f0/hqdefault.jpg",
     duration: 252
+  },
+  {
+    videoId: "fJ9rUzIMcZQ", // Queen - Bohemian Rhapsody
+    title: "Bohemian Rhapsody",
+    artist: "Queen",
+    album: "A Night at the Opera",
+    thumbnail: "https://i.ytimg.com/vi/fJ9rUzIMcZQ/hqdefault.jpg",
+    duration: 367
+  },
+  {
+    videoId: "YR5ApYxkU-U", // Backstreet Boys - I Want It That Way
+    title: "I Want It That Way",
+    artist: "Backstreet Boys",
+    album: "Millennium",
+    thumbnail: "https://i.ytimg.com/vi/YR5ApYxkU-U/hqdefault.jpg",
+    duration: 213
+  },
+  {
+    videoId: "kJQP7kiw5Fk", // Luis Fonsi - Despacito ft. Daddy Yankee
+    title: "Despacito",
+    artist: "Luis Fonsi ft. Daddy Yankee",
+    album: "Vida",
+    thumbnail: "https://i.ytimg.com/vi/kJQP7kiw5Fk/hqdefault.jpg",
+    duration: 282
+  },
+  {
+    videoId: "hT_nvWreIhg", // OneRepublic - Counting Stars
+    title: "Counting Stars",
+    artist: "OneRepublic",
+    album: "Native",
+    thumbnail: "https://i.ytimg.com/vi/hT_nvWreIhg/hqdefault.jpg",
+    duration: 257
   }
 ];
 
@@ -158,12 +190,9 @@ export const useYouTubeMusic = () => {
     setError(null);
 
     try {
-      // Since all external APIs are failing, let's use predefined search results
-      // with relevant filtering based on the search query
       const searchTerms = query.toLowerCase().split(' ');
       
-      // Get top tracks from a popular artist/song API
-      // We'll use our fallback data and filter it based on the query
+      // First attempt to filter the default tracks based on the query
       let filteredResults = DEFAULT_TRACKS.filter(track => {
         const trackTitle = track.title.toLowerCase();
         const trackArtist = track.artist.toLowerCase();
@@ -176,11 +205,14 @@ export const useYouTubeMusic = () => {
         );
       });
       
-      // If no matches, show all tracks
-      if (filteredResults.length === 0) {
-        // Generate dynamic results based on the search query
+      // If we have results from filtering, use those
+      if (filteredResults.length > 0) {
+        setSearchResults(filteredResults);
+        setError("YouTube API search not available. Using demo data that matches your search.");
+      } else {
+        // If no direct matches, generate dynamic results based on the search query
         const results: YouTubeMusicTrack[] = Array.from({ length: 5 }, (_, i) => ({
-          videoId: DEFAULT_TRACKS[i % DEFAULT_TRACKS.length].videoId,
+          videoId: `${query.replace(/\s+/g, '_')}_${i}_${Date.now()}`,
           title: `${query} - Song ${i + 1}`,
           artist: `Artist for "${query}"`,
           album: `Album for "${query}"`,
@@ -189,16 +221,15 @@ export const useYouTubeMusic = () => {
         }));
         
         setSearchResults(results);
-      } else {
-        setSearchResults(filteredResults);
+        setError("YouTube API search not available. Using generated demo tracks based on your search.");
       }
     } catch (error) {
       console.error("Error generating search results:", error);
       
       // Use fallback data if all else fails
-      const mockSearchResults: YouTubeMusicTrack[] = DEFAULT_TRACKS.map((track, i) => ({
+      const mockSearchResults: YouTubeMusicTrack[] = DEFAULT_TRACKS.slice(0, 4).map((track, i) => ({
         ...track,
-        title: `${query} ${track.title}`,
+        title: `${query} - ${track.title}`,
       }));
       
       setSearchResults(mockSearchResults);
