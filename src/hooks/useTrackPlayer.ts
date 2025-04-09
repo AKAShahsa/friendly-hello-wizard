@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useRef, useEffect } from "react";
 import { Howl } from "howler";
 import { Track } from "../types/music";
@@ -111,7 +112,7 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
     if (!track || prevTrackRef.current === track.id) return;
     prevTrackRef.current = track.id;
     
-    const isYouTubeTrack = track.isYouTubeMusic || track.youtubeId;
+    const isYouTubeTrack = Boolean(track.isYouTubeMusic || track.youtubeId);
     isYouTubeTrackRef.current = isYouTubeTrack;
     
     if (sound) {
