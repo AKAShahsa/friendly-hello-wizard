@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useRef, useEffect } from "react";
 import { Howl } from "howler";
 import { Track } from "../types/music";
@@ -86,21 +87,23 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
     
     const youtubeTimeTracker = setInterval(() => {
       const currentVideoTime = getYouTubeCurrentTime();
-      setCurrentTime(currentVideoTime);
-      
-      if (roomId && !isUpdatingRef.current) {
-        isUpdatingRef.current = true;
-        const userRef = ref(rtdb, `rooms/${roomId}/users/${userId}`);
-        update(userRef, {
-          currentTime: currentVideoTime,
-          lastActive: Date.now()
-        })
-          .catch(error => {
-            console.error("Error updating time in Firebase:", error);
+      if (typeof currentVideoTime === 'number') {
+        setCurrentTime(currentVideoTime);
+        
+        if (roomId && !isUpdatingRef.current) {
+          isUpdatingRef.current = true;
+          const userRef = ref(rtdb, `rooms/${roomId}/users/${userId}`);
+          update(userRef, {
+            currentTime: currentVideoTime || 0,
+            lastActive: Date.now()
           })
-          .finally(() => {
-            isUpdatingRef.current = false;
-          });
+            .catch(error => {
+              console.error("Error updating time in Firebase:", error);
+            })
+            .finally(() => {
+              isUpdatingRef.current = false;
+            });
+        }
       }
     }, 1000);
     
@@ -316,7 +319,7 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
         const playbackStateRef = ref(rtdb, `rooms/${roomId}/playbackState`);
         update(playbackStateRef, {
           isPlaying: !isPlaying,
-          position: getYouTubeCurrentTime(),
+          position: getYouTubeCurrentTime() || 0,
           serverTimestamp: Date.now()
         })
         .then(() => {
@@ -403,7 +406,7 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
         let timeValue = 0;
         
         if (isYouTubeTrackRef.current) {
-          timeValue = getYouTubeCurrentTime();
+          timeValue = getYouTubeCurrentTime() || 0;
         } else if (sound) {
           const time = sound.seek();
           timeValue = typeof time === 'number' ? time : 0;

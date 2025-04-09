@@ -40,8 +40,11 @@ const YouTubeMusicSearchSheet: React.FC<YouTubeMusicSearchSheetProps> = ({
   useEffect(() => {
     if (isOpen && searchQuery.trim().length > 0) {
       searchTracks(searchQuery);
+    } else if (isOpen && searchResults.length === 0) {
+      // Load some default tracks when opening the sheet
+      searchTracks("popular music");
     }
-  }, [isOpen, searchQuery, searchTracks]);
+  }, [isOpen, searchQuery, searchTracks, searchResults.length]);
 
   const handleAddTrack = (ytTrack: YouTubeMusicTrack) => {
     const track = convertToAppTrack(ytTrack);
@@ -121,8 +124,9 @@ const YouTubeMusicSearchSheet: React.FC<YouTubeMusicSearchSheetProps> = ({
           </form>
 
           {error && (
-            <div className="p-4 text-center text-red-500 bg-red-50 rounded-md mb-4">
-              {error}
+            <div className="p-4 text-center bg-yellow-50 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200 rounded-md mb-4">
+              <p className="text-sm">{error}</p>
+              <p className="text-xs mt-2">Using sample tracks for demonstration. Click any to play!</p>
             </div>
           )}
 
@@ -136,7 +140,7 @@ const YouTubeMusicSearchSheet: React.FC<YouTubeMusicSearchSheetProps> = ({
               <div className="space-y-3">
                 {searchResults.map((track) => (
                   <div
-                    key={track.videoId}
+                    key={track.videoId + '_' + Date.now().toString().slice(-4)}
                     className="flex items-center gap-3 p-2 rounded-md hover:bg-secondary/80"
                   >
                     <img
@@ -160,6 +164,7 @@ const YouTubeMusicSearchSheet: React.FC<YouTubeMusicSearchSheetProps> = ({
                         size="icon"
                         className="h-8 w-8"
                         onClick={() => handlePlayTrack(track)}
+                        title="Play now"
                       >
                         <Play className="h-4 w-4" />
                       </Button>
@@ -168,6 +173,7 @@ const YouTubeMusicSearchSheet: React.FC<YouTubeMusicSearchSheetProps> = ({
                         size="icon"
                         className="h-8 w-8"
                         onClick={() => handleAddTrack(track)}
+                        title="Add to queue"
                       >
                         <Plus className="h-4 w-4" />
                       </Button>
