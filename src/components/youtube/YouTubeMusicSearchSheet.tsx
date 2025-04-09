@@ -36,8 +36,8 @@ const YouTubeMusicSearchSheet: React.FC<YouTubeMusicSearchSheetProps> = ({
     playerState 
   } = useYouTubeMusic();
   
+  // Auto search when sheet opens if there's a query
   useEffect(() => {
-    // Automatically perform a search when the sheet opens with a query already set
     if (isOpen && searchQuery.trim().length > 0) {
       searchTracks(searchQuery);
     }
@@ -143,6 +143,10 @@ const YouTubeMusicSearchSheet: React.FC<YouTubeMusicSearchSheetProps> = ({
                       src={track.thumbnail}
                       alt={track.title}
                       className="h-12 w-12 rounded-md object-cover"
+                      onError={(e) => {
+                        // Fallback image if thumbnail fails to load
+                        (e.target as HTMLImageElement).src = "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg";
+                      }}
                     />
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate">{track.title}</div>
