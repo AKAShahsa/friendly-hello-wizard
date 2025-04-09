@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useRef, useEffect } from "react";
 import { Howl } from "howler";
 import { Track } from "../types/music";
@@ -127,11 +126,14 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
     
     try {
       if (isYouTubeTrack && track.youtubeId) {
+        console.log("Playing YouTube track:", track.title, "Video ID:", track.youtubeId);
+        
+        setCurrentTrack(track);
+        
         const success = playYouTubeVideo(track.youtubeId);
         
         if (success) {
           setIsPlaying(true);
-          setCurrentTrack(track);
           setCurrentTime(startPosition);
           
           setYouTubeVolume(Math.round(volume * 100));
@@ -172,7 +174,7 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
         } else {
           toast({
             title: "YouTube Playback Error",
-            description: "Could not play this YouTube track. Please try another.",
+            description: "Could not play this YouTube track. Please try again.",
             variant: "destructive"
           });
         }
@@ -379,7 +381,7 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
     }
   }, [sound, roomId, isHost, currentTrack, isPlaying, seekYouTubeVideo]);
 
-  const setVolume = useCallback((newVolume: number) => {
+  const setHowlerVolume = useCallback((newVolume: number) => {
     if (isYouTubeTrackRef.current) {
       setYouTubeVolume(Math.round(newVolume * 100));
     } else if (sound) {
@@ -461,8 +463,8 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
   }, [sound, stopYouTubeVideo]);
 
   useEffect(() => {
-    setVolume(volume);
-  }, [volume, setVolume]);
+    setHowlerVolume(volume);
+  }, [volume, setHowlerVolume]);
 
   return {
     sound,
@@ -473,7 +475,7 @@ export const useTrackPlayer = (roomId: string | null, userId: string, volume: nu
     playTrack,
     togglePlayPause,
     seek,
-    setVolume,
+    setVolume: setHowlerVolume,
     setupTimeTracking
   };
 };

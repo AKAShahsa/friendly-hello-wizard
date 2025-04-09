@@ -32,10 +32,12 @@ const YouTubeMusicSearchSheet: React.FC<YouTubeMusicSearchSheetProps> = ({
     isLoading, 
     error, 
     convertToAppTrack,
-    playYouTubeVideo 
+    playYouTubeVideo,
+    playerState 
   } = useYouTubeMusic();
   
   useEffect(() => {
+    // Automatically perform a search when the sheet opens with a query already set
     if (isOpen && searchQuery.trim().length > 0) {
       searchTracks(searchQuery);
     }
@@ -53,15 +55,20 @@ const YouTubeMusicSearchSheet: React.FC<YouTubeMusicSearchSheetProps> = ({
   const handlePlayTrack = (ytTrack: YouTubeMusicTrack) => {
     const track = convertToAppTrack(ytTrack);
     
-    // First check if the YouTube player can play this video
+    // First try to play directly with YouTube player
+    console.log("Attempting to play YouTube track:", ytTrack.videoId);
     const canPlay = playYouTubeVideo(ytTrack.videoId);
     
-    if (canPlay) {
-      onPlayTrack(track);
-      toast({
-        title: "Now playing",
-        description: `Playing ${track.title} by ${track.artist}`
-      });
+    // Even if direct play fails, we'll still attempt via the regular player system
+    onPlayTrack(track);
+    
+    toast({
+      title: "Now playing",
+      description: `Playing ${track.title} by ${track.artist}`
+    });
+    
+    // Only close the sheet if successful
+    if (canPlay || playerState.isReady) {
       onOpenChange(false);
     }
   };
@@ -73,13 +80,18 @@ const YouTubeMusicSearchSheet: React.FC<YouTubeMusicSearchSheetProps> = ({
     }
   };
 
-  // Handle search as you type
+  // Handle search as you type with debounce
   const handleSearchInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     setSearchQuery(query);
     
-    if (query.trim().length > 1) {
-      searchTracks(query);
+    if (query.trim().length > 2) {
+      // Use a simple debounce to avoid too many requests
+      const timeoutId = setTimeout(() => {
+        searchTracks(query);
+      }, 500);
+      
+      return () => clearTimeout(timeoutId);
     }
   };
 

@@ -23,9 +23,21 @@ export const useYouTubeMusic = () => {
   });
   
   const playerRef = useRef<any>(null);
+  const playerContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Initialize YouTube Player API
   useEffect(() => {
+    // Create container for YouTube player if it doesn't exist
+    if (!document.getElementById('youtube-player-container')) {
+      const container = document.createElement('div');
+      container.id = 'youtube-player-container';
+      container.style.position = 'absolute';
+      container.style.top = '-9999px';
+      container.style.left = '-9999px';
+      document.body.appendChild(container);
+      playerContainerRef.current = container;
+    }
+
     // Create YouTube API script tag if it doesn't exist
     if (!window.YT) {
       const tag = document.createElement('script');
@@ -36,48 +48,62 @@ export const useYouTubeMusic = () => {
 
     // Initialize player when YouTube API is ready
     window.onYouTubeIframeAPIReady = () => {
+      console.log('YouTube API is ready, initializing player');
+      
+      if (!playerContainerRef.current) {
+        playerContainerRef.current = document.getElementById('youtube-player-container') as HTMLDivElement;
+      }
+      
+      // Add player div if it doesn't exist
       if (!document.getElementById('youtube-player')) {
         const playerDiv = document.createElement('div');
         playerDiv.id = 'youtube-player';
-        playerDiv.style.position = 'absolute';
-        playerDiv.style.top = '-9999px';
-        playerDiv.style.left = '-9999px';
-        document.body.appendChild(playerDiv);
+        playerContainerRef.current?.appendChild(playerDiv);
       }
 
-      const player = new window.YT.Player('youtube-player', {
-        height: '0',
-        width: '0',
-        playerVars: {
-          autoplay: 0,
-          controls: 0,
-          disablekb: 1
-        },
-        events: {
-          onReady: () => {
-            console.log('YouTube player ready');
-            setPlayerState(prev => ({ ...prev, player, isReady: true }));
-            playerRef.current = player;
+      try {
+        const player = new window.YT.Player('youtube-player', {
+          height: '0',
+          width: '0',
+          playerVars: {
+            autoplay: 0,
+            controls: 0,
+            disablekb: 1
           },
-          onStateChange: (event: any) => {
-            if (event.data === window.YT.PlayerState.PLAYING) {
-              setPlayerState(prev => ({ ...prev, isPlaying: true }));
-            } else if (event.data === window.YT.PlayerState.PAUSED || 
-                       event.data === window.YT.PlayerState.ENDED) {
-              setPlayerState(prev => ({ ...prev, isPlaying: false }));
+          events: {
+            onReady: () => {
+              console.log('YouTube player ready');
+              setPlayerState(prev => ({ ...prev, player, isReady: true }));
+              playerRef.current = player;
+            },
+            onStateChange: (event: any) => {
+              if (event.data === window.YT.PlayerState.PLAYING) {
+                setPlayerState(prev => ({ ...prev, isPlaying: true }));
+              } else if (event.data === window.YT.PlayerState.PAUSED || 
+                         event.data === window.YT.PlayerState.ENDED) {
+                setPlayerState(prev => ({ ...prev, isPlaying: false }));
+              }
+            },
+            onError: (event: any) => {
+              console.error('YouTube player error:', event);
+              toast({
+                title: "YouTube Music Error",
+                description: "There was an error playing this track. Please try another track.",
+                variant: "destructive"
+              });
             }
-          },
-          onError: (event: any) => {
-            console.error('YouTube player error:', event);
-            toast({
-              title: "YouTube Music Error",
-              description: "There was an error playing this track. Please try another track.",
-              variant: "destructive"
-            });
           }
-        }
-      });
+        });
+      } catch (error) {
+        console.error('Error initializing YouTube player:', error);
+      }
     };
+
+    // If YouTube API is already loaded, manually trigger onYouTubeIframeAPIReady
+    if (window.YT && window.YT.Player) {
+      console.log('YouTube API already loaded, manually triggering initialization');
+      window.onYouTubeIframeAPIReady();
+    }
 
     // Cleanup
     return () => {
@@ -103,31 +129,31 @@ export const useYouTubeMusic = () => {
     setIsLoading(true);
     setError(null);
 
-    // Simulated response for development (in production, this would call the actual API)
     try {
-      // Simulated API call - in real implementation, this would be:
-      // const response = await fetch(`${YTM_API_BASE}/search?q=${encodeURIComponent(query)}`, {
-      //   headers: {
-      //     'Authorization': `Bearer ${apiPassword}`
-      //   }
-      // });
+      // Real YouTube search API call using a public API proxy
+      const response = await fetch(`https://youtube.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&q=${encodeURIComponent(query + " music")}&key=AIzaSyDAVB-m8TlFEiXY4G3NyrWKqK-iXQkwQQk`);
       
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 500));
+      if (!response.ok) {
+        throw new Error(`YouTube API error: ${response.status}`);
+      }
       
-      // For development, create mock data based on the search query
-      const mockSearchResults: YouTubeMusicTrack[] = Array.from({ length: 10 }, (_, i) => ({
-        videoId: `video_${query.replace(/\s+/g, '_')}_${i}`,
-        title: `${query} Song ${i + 1}`,
-        artist: `Artist ${(i % 3) + 1}`,
-        album: `Album ${(i % 5) + 1}`,
-        thumbnail: `https://picsum.photos/seed/${query}_${i}/200/200`,
-        duration: 180 + (i * 30) // 3-8 minutes
-      }));
+      const data = await response.json();
       
-      setSearchResults(mockSearchResults);
-      
-      if (mockSearchResults.length === 0) {
+      if (data.items && data.items.length > 0) {
+        const tracks: YouTubeMusicTrack[] = data.items
+          .filter((item: any) => item.id.videoId) // Only get videos, not playlists or channels
+          .map((item: any) => ({
+            videoId: item.id.videoId,
+            title: item.snippet.title,
+            artist: item.snippet.channelTitle,
+            album: 'YouTube Music',
+            thumbnail: item.snippet.thumbnails.high.url || item.snippet.thumbnails.default.url,
+            duration: 0 // Duration requires a separate API call, defaulting to 0
+          }));
+          
+        setSearchResults(tracks);
+      } else {
+        setSearchResults([]);
         toast({
           title: "No results",
           description: "No tracks found for your search.",
@@ -136,43 +162,105 @@ export const useYouTubeMusic = () => {
       }
     } catch (error) {
       console.error("Error searching tracks:", error);
-      setError("Failed to search YouTube Music tracks. Is YTMDesktop running?");
+      
+      // Fallback to mock data if the API fails
+      const mockSearchResults: YouTubeMusicTrack[] = Array.from({ length: 5 }, (_, i) => ({
+        videoId: `video_${i}_${Date.now()}`,
+        title: `${query} Song ${i + 1}`,
+        artist: `Artist ${(i % 3) + 1}`,
+        album: `Album ${(i % 5) + 1}`,
+        thumbnail: `https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg`,
+        duration: 180 + (i * 30) // 3-8 minutes
+      }));
+      
+      setSearchResults(mockSearchResults);
+      
+      setError("YouTube API search failed. Using fallback data.");
       toast({
         title: "Search Failed",
-        description: "Couldn't search YouTube Music tracks. Please ensure YTMDesktop is running.",
+        description: "Couldn't fetch YouTube Music tracks. Using fallback data.",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
-  }, [apiPassword]);
+  }, []);
 
   // Play a YouTube video
   const playYouTubeVideo = useCallback((videoId: string) => {
-    if (playerRef.current && playerRef.current.loadVideoById) {
-      try {
+    console.log(`Attempting to play YouTube video: ${videoId}`);
+    
+    if (!playerRef.current) {
+      console.warn("YouTube player not initialized");
+      toast({
+        title: "Player Not Ready",
+        description: "YouTube player is not initialized. Trying to set up player...",
+        variant: "destructive"
+      });
+      
+      // Try to initialize the player if it doesn't exist
+      if (window.YT && window.YT.Player) {
+        window.onYouTubeIframeAPIReady();
+        // Return false but don't block the attempt - the player might initialize quickly
+      } else {
+        return false;
+      }
+    }
+    
+    try {
+      if (playerRef.current && playerRef.current.loadVideoById) {
         console.log(`Playing YouTube video: ${videoId}`);
         playerRef.current.loadVideoById(videoId);
+        playerRef.current.playVideo();
+        
         setPlayerState(prev => ({ 
           ...prev, 
           isPlaying: true, 
           currentVideoId: videoId 
         }));
+        
         return true;
-      } catch (error) {
-        console.error("Error playing YouTube video:", error);
+      } else {
+        console.warn("YouTube player not ready or missing loadVideoById method");
+        
+        // Attempt to initialize again
+        if (window.YT && window.YT.Player && document.getElementById('youtube-player')) {
+          const player = new window.YT.Player('youtube-player', {
+            events: {
+              onReady: () => {
+                console.log('YouTube player ready after retry');
+                playerRef.current = player;
+                setPlayerState(prev => ({ ...prev, player, isReady: true }));
+                
+                // Try to play the video after initialization
+                setTimeout(() => {
+                  if (player && player.loadVideoById) {
+                    player.loadVideoById(videoId);
+                    player.playVideo();
+                    setPlayerState(prev => ({ 
+                      ...prev, 
+                      isPlaying: true, 
+                      currentVideoId: videoId 
+                    }));
+                  }
+                }, 1000);
+              }
+            }
+          });
+        }
+        
         toast({
-          title: "Playback Error",
-          description: "Could not play this YouTube Music track.",
+          title: "Player Not Ready",
+          description: "YouTube player is not ready yet. Please try again in a moment.",
           variant: "destructive"
         });
         return false;
       }
-    } else {
-      console.warn("YouTube player not ready");
+    } catch (error) {
+      console.error("Error playing YouTube video:", error);
       toast({
-        title: "Player Not Ready",
-        description: "YouTube player is not ready yet. Please try again in a moment.",
+        title: "Playback Error",
+        description: "Could not play this YouTube Music track.",
         variant: "destructive"
       });
       return false;
@@ -238,7 +326,7 @@ export const useYouTubeMusic = () => {
       album: ytTrack.album || "YouTube Music",
       coverUrl: ytTrack.thumbnail,
       audioUrl: "", // Using YouTube iframe instead of direct audio URL
-      duration: ytTrack.duration,
+      duration: ytTrack.duration || 180, // Default to 3 min if duration unknown
       isYouTubeMusic: true,
       youtubeId: ytTrack.videoId // Add YouTube video ID for direct playback
     };
