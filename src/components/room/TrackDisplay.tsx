@@ -2,16 +2,7 @@
 import React from "react";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Music } from "lucide-react";
-
-interface Track {
-  id: string;
-  title: string;
-  artist: string;
-  album: string;
-  coverUrl: string;
-  audioUrl: string;
-  duration: number;
-}
+import { Track } from "@/types/music";
 
 interface TrackDisplayProps {
   currentTrack: Track | null;
@@ -25,7 +16,7 @@ const TrackDisplay: React.FC<TrackDisplayProps> = ({ currentTrack }) => {
           <div className="mb-6 rounded-lg overflow-hidden shadow-xl">
             <AspectRatio ratio={1/1}>
               <img 
-                src={currentTrack.coverUrl} 
+                src={currentTrack.coverUrl || currentTrack.thumbnail} 
                 alt={`${currentTrack.title} by ${currentTrack.artist}`} 
                 className="w-full h-full object-cover transition-transform hover:scale-105 duration-700"
               />

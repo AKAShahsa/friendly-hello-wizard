@@ -5,16 +5,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Music, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-interface Track {
-  id: string;
-  title: string;
-  artist: string;
-  album: string;
-  coverUrl: string;
-  audioUrl: string;
-  duration: number;
-}
+import { Track } from "@/types/music";
 
 interface QueueSheetProps {
   isOpen: boolean;

@@ -3,11 +3,20 @@ export interface Track {
   id: string;
   title: string;
   artist: string;
-  url: string;
+  url?: string;
   thumbnail?: string;
   duration?: number;
   videoId?: string; // For YouTube tracks
   platform?: "spotify" | "youtube" | "default"; // Track source platform
+  
+  // Add missing properties that are being used in the app
+  album?: string;
+  coverUrl?: string;
+  audioUrl?: string;
+  isYouTubeMusic?: boolean;
+  youtubeId?: string;
+  isSpotify?: boolean;
+  spotifyId?: string;
 }
 
 export interface User {
@@ -46,8 +55,8 @@ export interface MusicContextType {
   roomId: string | null;
   reactions: Reaction;
   messages: ChatMessage[];
-  createRoom: () => Promise<string>;
-  joinRoom: (roomId: string) => Promise<boolean>;
+  createRoom: (name: string) => Promise<string>;
+  joinRoom: (roomId: string, userName: string) => Promise<boolean>;
   leaveRoom: () => void;
   addToQueue: (track: Track) => void;
   removeFromQueue: (trackId: string) => void;

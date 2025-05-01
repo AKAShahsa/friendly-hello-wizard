@@ -73,7 +73,10 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   } = useCommunication(roomId, userId);
 
   const {
-    createRoom, joinRoom, leaveRoom: leaveRoomFn, transferHostStatus
+    createRoom: createRoomFn,
+    joinRoom: joinRoomFn,
+    leaveRoom: leaveRoomFn,
+    transferHostStatus: transferHostStatusFn
   } = useRoomManagement(
     userId, setRoomId, setUsers, setMessages, 
     setReactions, setQueue, setCurrentTrackState
@@ -381,9 +384,9 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     roomId,
     reactions,
     messages: messages || [],
-    createRoom,
-    joinRoom,
-    leaveRoom,
+    createRoom: createRoom,
+    joinRoom: joinRoom,
+    leaveRoom: leaveRoom,
     addToQueue,
     removeFromQueue,
     playTrack: handlePlayTrack,
