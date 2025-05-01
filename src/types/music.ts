@@ -1,18 +1,13 @@
-// Track interface
+
 export interface Track {
   id: string;
   title: string;
   artist: string;
-  album: string;
-  coverUrl: string;
-  audioUrl: string;
-  duration: number;
-  // Optional Spotify fields
-  spotifyId?: string;
-  isSpotify?: boolean;
-  // Optional YouTube Music fields
-  youtubeId?: string;
-  isYouTubeMusic?: boolean;
+  url: string;
+  thumbnail?: string;
+  duration?: number;
+  videoId?: string; // For YouTube tracks
+  platform?: "spotify" | "youtube" | "default"; // Track source platform
 }
 
 export interface User {
@@ -21,9 +16,9 @@ export interface User {
   isHost: boolean;
   isActive: boolean;
   lastActive: number;
-  avatar?: string;
+  profilePicture?: string;
+  currentTrackId?: string;
   currentTime?: number;
-  typing?: boolean;
 }
 
 export interface ChatMessage {
@@ -32,14 +27,13 @@ export interface ChatMessage {
   text: string;
   timestamp: number;
   isAI?: boolean;
-  reactions?: {[key: string]: string[]};
+  videoUrl?: string; // Added for video messages
 }
 
 export interface Reaction {
   thumbsUp: number;
   heart: number;
   smile: number;
-  [key: string]: number;
 }
 
 export interface MusicContextType {
@@ -52,19 +46,19 @@ export interface MusicContextType {
   roomId: string | null;
   reactions: Reaction;
   messages: ChatMessage[];
-  createRoom: (userName: string) => Promise<string>;
-  joinRoom: (roomId: string, userName: string) => Promise<boolean>;
+  createRoom: () => Promise<string>;
+  joinRoom: (roomId: string) => Promise<boolean>;
   leaveRoom: () => void;
   addToQueue: (track: Track) => void;
   removeFromQueue: (trackId: string) => void;
-  playTrack: (track: Track, isRemoteChange?: boolean) => void;
+  playTrack: (track: Track) => void;
   togglePlayPause: () => void;
   nextTrack: () => Track | null;
   prevTrack: () => Track | null;
   seek: (time: number) => void;
   setVolume: (volume: number) => void;
-  sendChatMessage: (text: string) => void;
-  sendReaction: (type: keyof Reaction) => void;
-  addSongByUrl: (url: string, title?: string, artist?: string) => Promise<boolean>;
+  sendChatMessage: (message: string) => void;
+  sendReaction: (reactionType: keyof Reaction) => void;
+  addSongByUrl: (url: string) => Promise<boolean>;
   transferHostStatus: (userId: string) => void;
 }

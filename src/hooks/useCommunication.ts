@@ -1,3 +1,4 @@
+
 // useCommunication.ts
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -16,6 +17,35 @@ interface GeminiContent {
   role: 'user' | 'model';
   parts: GeminiContentPart[];
 }
+
+// List of sample videos for simulating generation
+const SAMPLE_VIDEOS = [
+  {
+    title: "Sunset at the beach",
+    description: "A beautiful timelapse of the sun setting over calm ocean waves, with vibrant orange and purple hues reflecting off the water surface.",
+    url: "https://v.ftcdn.net/04/17/35/22/240_F_417352297_OcugpV2PJjaQvQj8iDU75i8HKAoK5Blw_ST.mp4"
+  },
+  {
+    title: "City streets at night",
+    description: "A cinematic view of downtown streets with traffic lights and car headlights creating streaks of light against the night skyline.",
+    url: "https://v.ftcdn.net/03/59/61/84/240_F_359618440_UlDAqQ3YaqTWNkLD90T3b3w44osdXyra_ST.mp4"
+  },
+  {
+    title: "Forest nature scene",
+    description: "Sunlight filtering through tall trees in a lush forest, with gentle movement of leaves and branches in the breeze.",
+    url: "https://v.ftcdn.net/03/30/78/11/240_F_330781125_9RwX1tHrylsjLU9QR1yofa2S408Dy8f8_ST.mp4"
+  },
+  {
+    title: "Abstract digital animation",
+    description: "A colorful abstract animation with flowing geometric shapes and particles creating mesmerizing patterns.",
+    url: "https://v.ftcdn.net/04/05/44/00/240_F_405440088_cf0UCC5VmNFUs3u9NK7FClY0W2iqMI32_ST.mp4"
+  },
+  {
+    title: "Space and stars",
+    description: "A stunning visualization of stars and galaxies in deep space, with slow camera movement creating an immersive cosmic experience.",
+    url: "https://v.ftcdn.net/04/20/51/00/240_F_420510049_Jp0EMCOkSdi1J1xXzTe2FlvYtFO4meF1_ST.mp4"
+  }
+];
 
 export const useCommunication = (roomId: string | null, userId: string) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -71,7 +101,8 @@ export const useCommunication = (roomId: string | null, userId: string) => {
                 userName: msg.userName,
                 text: msg.text,
                 timestamp: msg.timestamp,
-                isAI: msg.isAI || msg.userId === 'ai-assistant' // Ensure isAI flag is set
+                isAI: msg.isAI || msg.userId === 'ai-assistant', // Ensure isAI flag is set
+                videoUrl: msg.videoUrl || null // Add support for video URLs
               } as ChatMessage;
             }
             return null;
@@ -218,12 +249,132 @@ export const useCommunication = (roomId: string | null, userId: string) => {
   };
   // --- END fetchGeminiResponse ---
 
+  // Helper function to handle video generation requests
+  const handleVideoGenerationRequest = async (prompt: string, userName: string): Promise<{text: string, videoUrl: string}> => {
+    // Simulate video generation process with a delay
+    const processingTime = Math.floor(Math.random() * 3000) + 2000; // 2-5 seconds
+    
+    await new Promise(resolve => setTimeout(resolve, processingTime));
+    
+    // Select a random sample video
+    const randomVideo = SAMPLE_VIDEOS[Math.floor(Math.random() * SAMPLE_VIDEOS.length)];
+    
+    // Create a response that simulates the AI describing the generated video
+    const response = `🎬 Generated video based on your prompt: "${prompt}"\n\n${randomVideo.description}\n\nThe video has been created and saved to your project files.`;
+    
+    return {
+      text: response,
+      videoUrl: randomVideo.url
+    };
+  };
+
+  // Determine if a message is a video generation request
+  const isVideoGenerationRequest = (text: string): string | null => {
+    const lowerText = text.toLowerCase();
+    if (lowerText.includes("generate a video") || lowerText.includes("create a video")) {
+      // Extract the prompt part after "generate a video" or "create a video"
+      const promptMatch = text.match(/(?:generate|create) a video (?:of|about|with|showing)? ?(.*)/i);
+      return promptMatch ? promptMatch[1].trim() : null;
+    }
+    return null;
+  };
 
   // --- MODIFIED sendChatMessage ---
   const sendChatMessage = useCallback(async (text: string) => {
     if (!roomId || !text.trim()) return;
 
     const userName = localStorage.getItem("userName") || "Anonymous";
+
+    // --- Handle Video Generation Request ---
+    const videoPrompt = isVideoGenerationRequest(text);
+    if (videoPrompt) {
+      // 1. Send the user's request message
+      const userMessage: ChatMessage = {
+        userId,
+        userName,
+        text,
+        timestamp: Date.now()
+      };
+
+      const dbMessagesRef = ref(rtdb, `rooms/${roomId}/messages`);
+      try {
+        await push(dbMessagesRef, userMessage);
+        socket.emit("newMessage", { roomId, message: userMessage });
+      } catch (error) {
+        console.error("Error sending video generation request:", error);
+        toast({ 
+          title: "Send Error", 
+          description: "Could not send your video generation request.", 
+          variant: "destructive" 
+        });
+        return;
+      }
+
+      // 2. Show processing toast
+      const processingToastId = toast({
+        title: "Generating Video...",
+        description: `Processing your request: "${videoPrompt}"`,
+        duration: 10000
+      });
+
+      // 3. Generate the video (simulation)
+      try {
+        const { text: responseText, videoUrl } = await handleVideoGenerationRequest(videoPrompt, userName);
+        
+        // 4. Send AI's response with the video URL
+        const aiVideoMessage: ChatMessage = {
+          userId: 'ai-assistant',
+          userName: 'Video Generator',
+          text: responseText,
+          timestamp: Date.now() + 1,
+          isAI: true,
+          videoUrl: videoUrl
+        };
+
+        await push(dbMessagesRef, aiVideoMessage);
+        socket.emit("newMessage", { roomId, message: aiVideoMessage });
+
+        if (processingToastId && typeof processingToastId.dismiss === 'function') {
+          processingToastId.dismiss();
+        }
+        
+        toast({
+          title: "Video Generated",
+          description: "Your video has been successfully created!",
+          variant: "default"
+        });
+      } catch (error) {
+        console.error("Error in video generation:", error);
+        
+        if (processingToastId && typeof processingToastId.dismiss === 'function') {
+          processingToastId.dismiss();
+        }
+        
+        toast({
+          title: "Video Generation Failed",
+          description: `Could not generate your video. ${error instanceof Error ? error.message : ''}`,
+          variant: "destructive"
+        });
+        
+        // Send error message to chat
+        const aiErrorMessage: ChatMessage = {
+          userId: 'ai-assistant',
+          userName: 'Video Generator',
+          text: `Sorry, I encountered an error trying to generate your video. ${error instanceof Error ? error.message : ''}`,
+          timestamp: Date.now() + 1,
+          isAI: true
+        };
+        
+        try {
+          await push(dbMessagesRef, aiErrorMessage);
+          socket.emit("newMessage", { roomId, message: aiErrorMessage });
+        } catch (sendError) {
+          console.error("Failed to send AI error message to chat:", sendError);
+        }
+      }
+      
+      return;
+    }
 
     // --- Handle AI Assistant Request ---
     if (text.trim().startsWith('@AI')) {
@@ -412,3 +563,4 @@ export const useCommunication = (roomId: string | null, userId: string) => {
     // Note: fetchGeminiResponse is internal, not usually returned unless needed directly by component
   };
 };
+

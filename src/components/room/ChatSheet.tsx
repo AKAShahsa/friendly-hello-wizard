@@ -325,6 +325,21 @@ const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messag
     };
   }, [roomId]);
 
+  const handleVideoGenerationClick = () => {
+    const videoPrompt = "generate a video of ";
+    setMessage(videoPrompt);
+    
+    // Focus the input field after setting the message
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+        // Position cursor at the end
+        inputRef.current.selectionStart = videoPrompt.length;
+        inputRef.current.selectionEnd = videoPrompt.length;
+      }
+    }, 0);
+  };
+
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent 
@@ -372,6 +387,20 @@ const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messag
                         className="mt-1 whitespace-pre-wrap break-words" 
                         dangerouslySetInnerHTML={formatMessageText(msg.text)}
                       />
+                      
+                      {/* Video player for video messages */}
+                      {msg.videoUrl && (
+                        <div className="mt-3 rounded-md overflow-hidden border">
+                          <video 
+                            controls
+                            className="w-full max-h-72 object-contain bg-black"
+                            src={msg.videoUrl}
+                            poster={`https://i.ytimg.com/vi/${msg.videoUrl.split('/').pop()?.split('.')[0]}/hqdefault.jpg`}
+                          >
+                            Your browser does not support the video tag.
+                          </video>
+                        </div>
+                      )}
                       
                       {/* Message reactions */}
                       <div className="flex items-center gap-2 mt-2">
@@ -525,6 +554,20 @@ const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messag
                 </PopoverContent>
               </Popover>
               
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1 text-xs"
+                onClick={handleVideoGenerationClick}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-video">
+                  <path d="m22 8-6 4 6 4V8Z"/>
+                  <rect width="14" height="12" x="2" y="6" rx="2" ry="2"/>
+                </svg>
+                Generate Video
+              </Button>
+              
               <Popover open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
                 <PopoverTrigger asChild>
                   <Button
@@ -574,3 +617,4 @@ const ChatSheet: React.FC<ChatSheetProps> = memo(({ isOpen, onOpenChange, messag
 ChatSheet.displayName = "ChatSheet";
 
 export default ChatSheet;
+
