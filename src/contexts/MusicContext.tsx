@@ -384,9 +384,9 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     roomId,
     reactions,
     messages: messages || [],
-    createRoom: createRoom,
-    joinRoom: joinRoom,
-    leaveRoom: leaveRoom,
+    createRoom: createRoomFn,
+    joinRoom: joinRoomFn,
+    leaveRoom,
     addToQueue,
     removeFromQueue,
     playTrack: handlePlayTrack,
@@ -398,7 +398,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     sendChatMessage,
     sendReaction,
     addSongByUrl,
-    transferHostStatus
+    transferHostStatus: transferHostStatusFn
   };
 
   return (
