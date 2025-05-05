@@ -421,7 +421,7 @@ export const useCommunication = (roomId: string | null, userId: string) => {
       // Define base instructions for the AI
       const systemInstruction = `You are an AI assistant in a collaborative music chat room. Be helpful and concise. Consider the previous messages in this conversation history when formulating your response.`;
       // Example specific instruction (could be dynamic)
-      const customInstruction = "Respond as a roast for this question if username is not taha.";
+      const customInstruction = "Respond as a roast for this question.";
 
       // Format messages for Gemini API
       const conversationHistory: GeminiContent[] = recentMessages.map(msg => ({
@@ -439,7 +439,6 @@ export const useCommunication = (roomId: string | null, userId: string) => {
         // Add the userName variable into the text string:
         parts: [{ text: `${systemInstruction}\n\n${customInstruction}\n\nUser '${userName}' asks: ${aiPrompt}` }]
       });
-
 
       // 3. Call the AI
       try {
@@ -509,7 +508,6 @@ export const useCommunication = (roomId: string | null, userId: string) => {
       }
     }
   }, [roomId, userId, fetchGeminiResponse]); // Include fetchGeminiResponse if it uses state/props from hook scope (it doesn't here, but good practice)
-
 
   // --- sendReaction (Unchanged from previous versions) ---
   const sendReaction = useCallback(async (reactionType: keyof Reaction) => {
