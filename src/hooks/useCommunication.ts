@@ -1,4 +1,3 @@
-
 // useCommunication.ts
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -420,7 +419,7 @@ export const useCommunication = (roomId: string | null, userId: string) => {
       const recentMessages = currentMessages.slice(-MAX_HISTORY_MESSAGES);
 
       // Define base instructions for the AI
-      const systemInstruction = `You are an AI assistant in a collaborative music chat room built by Taha (respect taha in every responce you mention him). Be helpful and concise. Consider the previous messages in this conversation history when formulating your response.`;
+      const systemInstruction = `You are an AI assistant in a collaborative music chat room. Be helpful and concise. Consider the previous messages in this conversation history when formulating your response.`;
       // Example specific instruction (could be dynamic)
       const customInstruction = "Respond as a roast for this question if username is not taha.";
 
@@ -563,4 +562,3 @@ export const useCommunication = (roomId: string | null, userId: string) => {
     // Note: fetchGeminiResponse is internal, not usually returned unless needed directly by component
   };
 };
-
